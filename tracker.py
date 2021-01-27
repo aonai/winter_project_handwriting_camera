@@ -15,7 +15,7 @@ config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8,
 profile = pipeline.start(config)
 
 
-class Handler():
+class Tracker():
     """ helper class to handle realsen camera vision """
     def __init__(self):
         self.background_color = 255
@@ -23,7 +23,7 @@ class Handler():
         self.min_distance_in_meters = -0.3
 
         self.pen = [None, None]
-        self.canvas = None
+        self.board = None
 
         self.window_name = "Track Pen"
         self.window_images = None
@@ -42,6 +42,9 @@ class Handler():
                 # Press esc or 'q' to close the image window
                 cv.destroyAllWindows()
                 break
+            elif key & 0xFF == ord('s'):
+                print("saving writing")
+                self.save_board()
                 
     def setup_stream(self):
         # setup streaming 
@@ -95,8 +98,8 @@ class Handler():
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
         
-        if self.canvas is None:
-            self.canvas = np.zeros_like(color_image)
+        if self.board is None:
+            self.board = np.zeros_like(color_image)
 
         depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
         bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
@@ -135,7 +138,7 @@ class Handler():
             image - image to draw contours on
         """
         contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 200:
+        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 500:
             c = max(contours, key=cv.contourArea)
             x, y, w, h = cv.boundingRect(c)
             cv.rectangle(image, (x, y), (x+w, y+h), (0,25, 255), 2)
@@ -145,16 +148,19 @@ class Handler():
             self.pen[1] = (x, y)
         
         if not self.pen[0] is None:
-            self.canvas = cv.line(self.canvas, self.pen[0], self.pen[1], (0,25, 255), 5)
-            image = cv.add(image, self.canvas)
+            self.board = cv.line(self.board, self.pen[0], self.pen[1], (0,25, 255), 5)
+            image = cv.add(image, self.board)
 
         return image
+
+    def save_board(self):
+        cv.imwrite('test_image.png',self.board)
         
 
 
 def main():
     """ The main() function. """
-    handler = Handler()
+    tracker = Tracker()
 
 if __name__=="__main__": 
     try:
