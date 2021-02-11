@@ -1,6 +1,7 @@
-import pyrealsense2 as rs
-import numpy as np
 import cv2 as cv
+import numpy as np
+import pyrealsense2 as rs
+
 
 # ------------- variables ---------------
 frame_width = 640
@@ -20,10 +21,19 @@ class Tracker():
     def __init__(self):
         self.background_color = 255
         self.clipping_distance_in_meters = 0.3
-        self.min_distance_in_meters = -0.3
+        self.min_distance_in_meters = 0
 
         self.pen = [None, None]
+        self.pen_x = []
+        self.pen_y = []
         self.board = None
+        self.board_rect = None
+        self.rect_min = (int(frame_height/5))
+        self.rect_max = (int(frame_height*4/5))
+        self.rect_xy = [(self.rect_min, self.rect_min), 
+                        (self.rect_min, self.rect_max),
+                        (self.rect_max, self.rect_max), 
+                        (self.rect_max, self.rect_min)]
 
         self.window_name = "Track Pen"
         self.window_images = None
@@ -43,8 +53,10 @@ class Tracker():
                 cv.destroyAllWindows()
                 break
             elif key & 0xFF == ord('s'):
-                print("saving writing")
                 self.save_board()
+            elif key & 0xFF == ord('c'):
+                print("clear board")
+                self.clear_board()
                 
     def setup_stream(self):
         # setup streaming 
@@ -100,6 +112,11 @@ class Tracker():
         
         if self.board is None:
             self.board = np.zeros_like(color_image)
+            self.board_rect = np.zeros_like(color_image)
+            self.board_rect = cv.line(self.board_rect, self.rect_xy[0],  self.rect_xy[1], (0,255, 25), 10)
+            self.board_rect = cv.line(self.board_rect, self.rect_xy[1],  self.rect_xy[2], (0,255, 25), 10)
+            self.board_rect = cv.line(self.board_rect, self.rect_xy[2],  self.rect_xy[3], (0,255, 25), 10)
+            self.board_rect = cv.line(self.board_rect, self.rect_xy[3],  self.rect_xy[0], (0,255, 25), 10)
 
         depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
         bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
@@ -110,6 +127,7 @@ class Tracker():
         mask = self.filter_color(hsv)
 
         # draw
+        color_image = cv.add(color_image, self.board_rect)
         color_image = self.draw(mask, color_image)
 
         mask_bw = cv.cvtColor(mask, cv.COLOR_GRAY2BGR) # back and white images 
@@ -119,7 +137,8 @@ class Tracker():
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
         
         # stack images
-        self.window_images = np.hstack((bg_removed, color_image, res))
+        # self.window_images = np.hstack((bg_removed, color_image, res))
+        self.window_images = np.hstack((bg_removed, np.fliplr(color_image), res))
     
     def filter_color(self, hsv):
         lower_color, upper_color = self.get_tracekbar_val()
@@ -138,24 +157,39 @@ class Tracker():
             image - image to draw contours on
         """
         contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 500:
+        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 800:
             c = max(contours, key=cv.contourArea)
             x, y, w, h = cv.boundingRect(c)
             cv.rectangle(image, (x, y), (x+w, y+h), (0,25, 255), 2)
 
-            # TODO: filter noises here 
-            self.pen[0] = self.pen[1]
-            self.pen[1] = (x, y)
-        
+            if x < self.rect_max and x > self.rect_min and y < self.rect_max and y > self.rect_min:
+                self.pen_x.append(x)
+                self.pen_y.append(y)
+            else:
+                self.pen_x = []
+                self.pen_y = []
+
+            if len(self.pen_x) == 10:
+                self.pen[0] = self.pen[1]
+                self.pen[1] = (int(np.average(self.pen_x)), int(np.average(self.pen_y)))
+                self.pen_x = []
+                self.pen_y = []
+
         if not self.pen[0] is None:
-            self.board = cv.line(self.board, self.pen[0], self.pen[1], (0,25, 255), 5)
+            self.board = cv.line(self.board, self.pen[0], self.pen[1], (255,255, 255), 20)
             image = cv.add(image, self.board)
 
         return image
 
     def save_board(self):
-        cv.imwrite('test_image.png',self.board)
-        
+        print("saving writing")
+        cv.imwrite('test_image.png',self.board[self.rect_min:self.rect_max, self.rect_min:self.rect_max])
+    
+    def clear_board(self):
+        self.board = None
+        self.pen_x = []
+        self.pen_y = []
+        self.pen = [None, None]
 
 
 def main():
