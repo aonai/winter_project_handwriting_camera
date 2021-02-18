@@ -20,7 +20,7 @@ class Tracker():
     """ helper class to handle realsen camera vision """
     def __init__(self):
         self.background_color = 255
-        self.clipping_distance_in_meters = 0.3
+        self.clipping_distance_in_meters = 0.4
         self.min_distance_in_meters = 0
 
         self.pen = [None, None]
