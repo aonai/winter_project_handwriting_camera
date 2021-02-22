@@ -81,15 +81,14 @@ class Detection():
         bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
                             self.background_color, color_image)
              
-        mask, color_mask = self.bg_sub(bg_removed, color_image)
-        # color_image = self.detect(mask, color_image)
+        grey_mask, color_mask = self.bg_sub(bg_removed, color_image)
+        color_image = self.detect(grey_mask, color_image)
         
         # depth and color images combined 
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
         
         # stack images
-        # self.window_images = np.hstack((bg_removed, color_image, res))
-        self.window_images = np.hstack((mask, color_mask, np.fliplr(color_image)))
+        self.window_images = np.hstack((grey_mask, color_mask, np.fliplr(color_image)))
         self.image_to_save = color_mask
  
     def detect(self, mask, color_image):
@@ -97,15 +96,16 @@ class Detection():
                                                 minSize=(50,50), maxSize=(100,100))
         for (x,y,w,h) in detections:
             color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0),2)
+
         return color_image
 
     def bg_sub(self, bg_removed, color_image):
         mask = back_sub.apply(color_image)
         mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
         # grey
-        mask_bw = cv.cvtColor(mask,cv.COLOR_GRAY2RGB)
+        grey_mask = cv.cvtColor(mask,cv.COLOR_GRAY2RGB)
 
-        # rgb 
+        # rgb - color mask
         mask_inv = cv.bitwise_not(mask)
         gray = cv.cvtColor(color_image, cv.COLOR_BGR2GRAY)
         rows, cols, channels = color_image.shape
@@ -117,17 +117,14 @@ class Detection():
         color_mask = colored_portion + gray_portion
         color_mask = cv.GaussianBlur(color_mask,(5,5),0)
 
-        # increase brightness
-        brightness = 50
-        hsv = cv.cvtColor(color_mask, cv.COLOR_BGR2HSV)
-        h, s, v = cv.split(hsv)
-        lim = 255 - brightness
-        v[v > lim] = 255
-        v[v <= lim] += brightness
-        final_hsv = cv.merge((h, s, v))
-        color_mask = cv.cvtColor(final_hsv, cv.COLOR_HSV2BGR)
- 
-        return mask_bw, color_mask
+        # gamma correction - increase brightness
+        gamma = 0.5
+        lookUpTable = np.empty((1,256), np.uint8)
+        for i in range(256):
+            lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+        color_mask = cv.LUT(color_mask, lookUpTable)
+
+        return grey_mask, color_mask
 
     def save_image(self):
         print("saving image #", self.idx)
