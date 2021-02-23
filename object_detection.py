@@ -18,7 +18,7 @@ config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 
 config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
 profile = pipeline.start(config)
 
-cascade=cv.CascadeClassifier("cascade_50x50/cascade.xml")
+cascade=cv.CascadeClassifier("trainsets_5/cascade/cascade.xml")
 back_sub = cv.createBackgroundSubtractorKNN()
 
 class Detection():
@@ -82,18 +82,19 @@ class Detection():
                             self.background_color, color_image)
              
         grey_mask, color_mask = self.bg_sub(bg_removed, color_image)
-        color_image = self.detect(grey_mask, color_image)
+        color_image = self.detect(color_mask, color_image)
         
         # depth and color images combined 
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
         
         # stack images
+        # self.window_images = color_image
         self.window_images = np.hstack((grey_mask, color_mask, np.fliplr(color_image)))
         self.image_to_save = color_mask
  
     def detect(self, mask, color_image):
-        detections = cascade.detectMultiScale(mask, scaleFactor=2, minNeighbors=3, 
-                                                minSize=(50,50), maxSize=(100,100))
+        img = cv.imread('trainsets_5/p/zzylfizgnt.jpg')
+        detections = cascade.detectMultiScale(img)
         for (x,y,w,h) in detections:
             color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0),2)
 
@@ -118,7 +119,7 @@ class Detection():
         color_mask = cv.GaussianBlur(color_mask,(5,5),0)
 
         # gamma correction - increase brightness
-        gamma = 0.5
+        gamma = 0.8
         lookUpTable = np.empty((1,256), np.uint8)
         for i in range(256):
             lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
@@ -130,7 +131,7 @@ class Detection():
         print("saving image #", self.idx)
         self.next_call = self.next_call+1
         threading.Timer( self.next_call - time.time(), self.save_image).start()
-        cv.imwrite(f'trainsets_4/test_image_{self.idx}.png',self.image_to_save)
+        cv.imwrite(f'trainsets_5/p/test_image_{self.idx}.png',self.image_to_save)
         self.idx += 1
     
 
