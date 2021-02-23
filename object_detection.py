@@ -18,7 +18,7 @@ config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 
 config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
 profile = pipeline.start(config)
 
-cascade=cv.CascadeClassifier("trainsets_5/cascade/cascade.xml")
+cascade=cv.CascadeClassifier("trainsets_7/cascade/cascade.xml")
 back_sub = cv.createBackgroundSubtractorKNN()
 
 class Detection():
@@ -83,7 +83,7 @@ class Detection():
                             self.background_color, color_image)
              
         grey_mask, color_mask = self.bg_sub(bg_removed, color_image)
-        # color_image = self.detect(color_mask, color_image)
+        color_image = self.detect(color_mask, color_image)
         
         # depth and color images combined 
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
@@ -94,15 +94,19 @@ class Detection():
         self.image_to_save = color_mask
  
     def detect(self, mask, color_image):
-        detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=20, scaleFactor=2)
+        # detections = cascade.detectMultiScale(mask)
+        detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=50, scaleFactor=2)
+        # for (x,y,w,h) in detections:
+        #     if self.last_detection[0] == None:
+        #         self.last_detection = (x, y, time.time())
+        #     if abs(x-self.last_detection[0]) < 50 and abs(y-self.last_detection[1]) < 50 \
+        #         or time.time() - self.last_detection[2] > 0.5:
+        #         color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
+        #         self.last_detection = (x, y, time.time())
+        #         break
+
         for (x,y,w,h) in detections:
-            if self.last_detection[0] == None:
-                self.last_detection = (x, y, time.time())
-            if abs(x-self.last_detection[0]) < 50 and abs(y-self.last_detection[1]) < 50 \
-                or time.time() - self.last_detection[2] > 0.5:
-                color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
-                self.last_detection = (x, y, time.time())
-                break
+            color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
 
         return color_image
 
