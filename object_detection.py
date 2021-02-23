@@ -83,7 +83,7 @@ class Detection():
                             self.background_color, color_image)
              
         grey_mask, color_mask = self.bg_sub(bg_removed, color_image)
-        color_image = self.detect(color_mask, color_image)
+        # color_image = self.detect(color_mask, color_image)
         
         # depth and color images combined 
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
@@ -125,7 +125,7 @@ class Detection():
         color_mask = cv.GaussianBlur(color_mask,(5,5),0)
 
         # gamma correction - increase brightness
-        gamma = 1
+        gamma = 0.8
         lookUpTable = np.empty((1,256), np.uint8)
         for i in range(256):
             lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
@@ -135,11 +135,10 @@ class Detection():
 
     def save_image(self):
         print("saving image #", self.idx)
-        self.next_call = self.next_call+1
+        self.next_call = self.next_call+0.5
         threading.Timer( self.next_call - time.time(), self.save_image).start()
-        cv.imwrite(f'trainsets_5/p/test_image_{self.idx}.png',self.image_to_save)
+        cv.imwrite(f'trainsets_7/p/test_image_{self.idx}.png',self.image_to_save)
         self.idx += 1
-    
 
 
 def main():
