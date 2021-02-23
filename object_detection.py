@@ -29,6 +29,7 @@ class Detection():
         self.background_color = 255
         self.clipping_distance_in_meters = 0.4
         self.min_distance_in_meters = 0
+        self.last_detection = (None, None, None)
 
         self.window_name = "Detector"
         self.window_images = None
@@ -93,10 +94,15 @@ class Detection():
         self.image_to_save = color_mask
  
     def detect(self, mask, color_image):
-        img = cv.imread('trainsets_5/p/zzylfizgnt.jpg')
-        detections = cascade.detectMultiScale(img)
+        detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=20, scaleFactor=2)
         for (x,y,w,h) in detections:
-            color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0),2)
+            if self.last_detection[0] == None:
+                self.last_detection = (x, y, time.time())
+            if abs(x-self.last_detection[0]) < 50 and abs(y-self.last_detection[1]) < 50 \
+                or time.time() - self.last_detection[2] > 0.5:
+                color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
+                self.last_detection = (x, y, time.time())
+                break
 
         return color_image
 
@@ -119,7 +125,7 @@ class Detection():
         color_mask = cv.GaussianBlur(color_mask,(5,5),0)
 
         # gamma correction - increase brightness
-        gamma = 0.8
+        gamma = 1
         lookUpTable = np.empty((1,256), np.uint8)
         for i in range(256):
             lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
