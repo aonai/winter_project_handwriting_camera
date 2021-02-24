@@ -1,10 +1,8 @@
 import cv2 as cv
 import numpy as np
 import pyrealsense2 as rs
-import datetime, threading, time
-
-
-
+import threading, time
+import string, random
 
 # ------------- variables ---------------
 frame_width = 640
@@ -18,22 +16,30 @@ config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 
 config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
 profile = pipeline.start(config)
 
-cascade=cv.CascadeClassifier("trainsets_8/cascade/cascade.xml")
-back_sub = cv.createBackgroundSubtractorKNN()
-
 class Detection():
-    """ helper class to handle realsen camera vision """
+    """ Helper class to for realsen camera vision with haar casacde detections.
+    Use this class to visualize the performance of your haar cascade model or save 
+    frames to be used in training.
+    Follow instructions specified in data_gen.py to train a haar cascade model.
+
+    Press 's' to start saving choosen frames (defined in self.image_to_save) for each 0.5 sec.
+    """
     def __init__(self):
-        self.next_call = time.time()
-        self.idx = 0
+        # variables for depth camera
         self.background_color = 255
         self.clipping_distance_in_meters = 0.4
         self.min_distance_in_meters = 0
-        self.last_detection = (None, None, None)
 
-        self.window_name = "Detector"
+        # variable for saving frames
+        self.next_call = time.time()
+        self.idx = 0
+
+        # variables for opencv frames
+        self.window_name = "Test Detector"
         self.window_images = None
 
+        # initialize
+        self.cascade=cv.CascadeClassifier("trainsets_9/cascade/cascade.xml")
         self.setup_stream()
         cv.namedWindow(self.window_name, cv.WINDOW_AUTOSIZE)
 
@@ -51,6 +57,7 @@ class Detection():
                 self.save_image()
 
     def setup_stream(self):
+        """ Setup streaming for realsense camera """
         # setup streaming 
         depth_sensor = profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
@@ -64,6 +71,13 @@ class Detection():
         self.align = rs.align(align_to)
 
     def setup_window(self):
+        """ Setup window images to be shown 
+        Align depth and colored frames received from intel realsense depth camera, then start tracking a pen
+        either using haar cascade object detections.
+
+        Edit `self.window_images` here to change output frame preference.
+        Edit `self.image_to_save` to change prefereed frames for training.
+        """ 
         # get frames 
         frames = pipeline.wait_for_frames()
         aligned_frames = self.align.process(frames)
@@ -77,72 +91,43 @@ class Detection():
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
 
-
-        depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
-        bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
-                            self.background_color, color_image)
-             
-        grey_mask, color_mask = self.bg_sub(bg_removed, color_image)
-        color_image = self.detect(color_mask, color_image)
+        # track pen
+        color_image = self.detect(color_image)
         
-        # depth and color images combined 
-        depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
-        
-        # stack images
         self.window_images = np.fliplr(color_image)
-        # self.window_images = np.hstack((grey_mask, color_mask, np.fliplr(color_image)))
         self.image_to_save = color_image
  
-    def detect(self, mask, color_image):
-        detections = cascade.detectMultiScale(color_image)
-        # detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=50, scaleFactor=2)
-        # for (x,y,w,h) in detections:
-        #     if self.last_detection[0] == None:
-        #         self.last_detection = (x, y, time.time())
-        #     if abs(x-self.last_detection[0]) < 50 and abs(y-self.last_detection[1]) < 50 \
-        #         or time.time() - self.last_detection[2] > 0.5:
-        #         color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
-        #         self.last_detection = (x, y, time.time())
-        #         break
+    def detect(self, color_image):
+        """ Track pen using a haar cascade model
+        Detected objects will be bounded by blue boxes. 
+        Edit `minSize` and `maxSize` in `detectMultiScale` to define min and max size of object that should be detected.
+        Edit `minNeighbors` in `detectMultiScale` to filterout low possibility detections. Increase this number will 
+        likely to decrease noises, but true positive images may also be lost.
+        Edit `scaleFactor` in `detectMultiScale` to define scaling factor of objects. 
 
+            Args: 
+                color_image: frame used for haar cascade detections. This frame should have the same 
+                        setup when cascade model is trained. The default is colored RGB image.
+        """
+        detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(80,80), minNeighbors=8)
         for (x,y,w,h) in detections:
             color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
-
         return color_image
 
-    def bg_sub(self, bg_removed, color_image):
-        mask = back_sub.apply(color_image)
-        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
-        # grey
-        grey_mask = cv.cvtColor(mask,cv.COLOR_GRAY2RGB)
-
-        # rgb - color mask
-        mask_inv = cv.bitwise_not(mask)
-        gray = cv.cvtColor(color_image, cv.COLOR_BGR2GRAY)
-        rows, cols, channels = color_image.shape
-        image = color_image[0:rows, 0:cols]
-        colored_portion = cv.bitwise_or(image, image, mask = mask)
-        colored_portion = colored_portion[0:rows, 0:cols]
-        gray_portion = cv.bitwise_or(gray, gray, mask = mask_inv)
-        gray_portion = np.stack((gray_portion,)*3, axis=-1)
-        color_mask = colored_portion + gray_portion
-        color_mask = cv.GaussianBlur(color_mask,(5,5),0)
-
-        # gamma correction - increase brightness
-        gamma = 0.8
-        lookUpTable = np.empty((1,256), np.uint8)
-        for i in range(256):
-            lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
-        color_mask = cv.LUT(color_mask, lookUpTable)
-
-        return grey_mask, color_mask
-
     def save_image(self):
+        """ Helper class to save image for each 0.5 seconds 
+        https://stackoverflow.com/questions/8600161/executing-periodic-actions-in-python
+        The frame that is saved is defined by `self.save_image`. Edit this variable at end of `self.setup_window`.
+        """
         print("saving image #", self.idx)
-        self.next_call = self.next_call+0.5
-        threading.Timer( self.next_call - time.time(), self.save_image).start()
-        cv.imwrite(f'trainsets_8/p/test_image_{self.idx}.png',self.image_to_save)
         self.idx += 1
+        letters = string.ascii_lowercase
+        rnd_str = ( ''.join(random.choice(letters) for i in range(10)) )
+        cv.imwrite(f'tmp/image_{self.idx}_{rnd_str}.png',self.image_to_save)
+        
+        # change 0.5 to other seconds if wish to call this function at a different time loop
+        self.next_call = self.next_call+0.5     
+        threading.Timer(self.next_call - time.time(), self.save_image).start()
 
 
 def main():
