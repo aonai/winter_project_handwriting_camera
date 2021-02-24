@@ -18,7 +18,7 @@ config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 
 config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
 profile = pipeline.start(config)
 
-cascade=cv.CascadeClassifier("trainsets_7/cascade/cascade.xml")
+cascade=cv.CascadeClassifier("trainsets_8/cascade/cascade.xml")
 back_sub = cv.createBackgroundSubtractorKNN()
 
 class Detection():
@@ -89,13 +89,13 @@ class Detection():
         depth_colormap = cv.applyColorMap(cv.convertScaleAbs(depth_image, alpha=0.03), cv.COLORMAP_JET) 
         
         # stack images
-        # self.window_images = color_image
-        self.window_images = np.hstack((grey_mask, color_mask, np.fliplr(color_image)))
-        self.image_to_save = color_mask
+        self.window_images = np.fliplr(color_image)
+        # self.window_images = np.hstack((grey_mask, color_mask, np.fliplr(color_image)))
+        self.image_to_save = color_image
  
     def detect(self, mask, color_image):
-        # detections = cascade.detectMultiScale(mask)
-        detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=50, scaleFactor=2)
+        detections = cascade.detectMultiScale(color_image)
+        # detections = cascade.detectMultiScale(mask, minSize=(30,30), maxSize=(50,50), minNeighbors=50, scaleFactor=2)
         # for (x,y,w,h) in detections:
         #     if self.last_detection[0] == None:
         #         self.last_detection = (x, y, time.time())
@@ -141,7 +141,7 @@ class Detection():
         print("saving image #", self.idx)
         self.next_call = self.next_call+0.5
         threading.Timer( self.next_call - time.time(), self.save_image).start()
-        cv.imwrite(f'trainsets_7/p/test_image_{self.idx}.png',self.image_to_save)
+        cv.imwrite(f'trainsets_8/p/test_image_{self.idx}.png',self.image_to_save)
         self.idx += 1
 
 
