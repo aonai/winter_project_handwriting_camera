@@ -17,8 +17,8 @@ config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8,
 profile = pipeline.start(config)
 
 class Detection():
-    """ Helper class to for realsen camera vision with haar casacde detections.
-    Use this class to visualize the performance of your haar cascade model or save 
+    """ Helper class to use realsense camera vision with haar casacde detections.
+    Use this class to visualize the performance of haar cascade model or save 
     frames to be used in training.
     Follow instructions specified in data_gen.py to train a haar cascade model.
 
@@ -109,13 +109,13 @@ class Detection():
                 color_image: frame used for haar cascade detections. This frame should have the same 
                         setup when cascade model is trained. The default is colored RGB image.
         """
-        detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(80,80), minNeighbors=8)
+        detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(80,80), minNeighbors=10)
         for (x,y,w,h) in detections:
             color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
         return color_image
 
     def save_image(self):
-        """ Helper class to save image for each 0.5 seconds 
+        """ Helper function to save image for each 0.5 seconds 
         https://stackoverflow.com/questions/8600161/executing-periodic-actions-in-python
         The frame that is saved is defined by `self.save_image`. Edit this variable at end of `self.setup_window`.
         """

@@ -52,7 +52,7 @@ import cv2
 from icrawler.builtin import BingImageCrawler
 
 def download_neg_images():
-    """ Helper class to download negative images using icrawler (https://pypi.org/project/icrawler/).
+    """ Helper function to download negative images using icrawler (https://pypi.org/project/icrawler/).
     Edit `keywords` to change search words in Bing.
     Edit `max_num` in `craw` to change number of images of download. Notice that a link to a image
     may be outdated or invalid and will not be downloaded, so indicating a maximum number larger 

@@ -2,6 +2,8 @@ import cv2 as cv
 import numpy as np
 import pyrealsense2 as rs
 import time
+from net_classifier import Classifier
+import os, random, string
 
 
 # ------------- variables ---------------
@@ -18,7 +20,7 @@ profile = pipeline.start(config)
 
 
 class Tracker():
-    """ helper class to handle realsen camera vision 
+    """ Class to handle realsen camera vision 
     This class should setup intel realsense camera streaming, allow setting up filter color
     range using trackbars, track a pen by either color filtering or haar cascade detections to
     writing on the frames, and finally output preditected letters written on the frames. 
@@ -41,6 +43,11 @@ class Tracker():
         self.write_time = time.time()        
         self.cascade=cv.CascadeClassifier("cascade/cascade.xml")
 
+        # pytorch classifier
+        self.classifier = Classifier()
+        self.predictions = []
+        self.pred_idx = 0
+
         # variables for opencv frames
         self.window_name = "Track Pen"
         self.window_images = None
@@ -48,12 +55,14 @@ class Tracker():
         # initialize
         self.setup_stream()
         cv.namedWindow(self.window_name, cv.WINDOW_AUTOSIZE)
+        self.insturctions = None
 
         # Uncomment the following to define range of color to filter using trackbar
         # self.enable_trackbar() 
         
         while True:
             self.setup_window()
+            cv.imshow("Instructions", self.insturctions)
             cv.imshow(self.window_name, self.window_images)
 
             # ---------  keys ----------------
@@ -65,8 +74,11 @@ class Tracker():
             elif key & 0xFF == ord('s'):
                 self.save_board()
             elif key & 0xFF == ord('c'):
-                print("clear board")
+                print("Clear board")
                 self.clear_board()
+            elif key & 0xFF == ord('n'):
+                print("Redo prediction")
+                self.redo_classify()
                 
     def setup_stream(self):
         """ Setup streaming for realsense camera """
@@ -94,7 +106,7 @@ class Tracker():
         cv.createTrackbar('Upper V', self.window_name, 255, 255, lambda _: None)
 
     def get_tracekbar_val(self):
-        """ Helper class to filter color when using trackbars 
+        """ Filter color when using trackbars 
         
             Returns:
                 lower_color: lower bound of filter color range in np.array([h, s, v]) format
@@ -145,6 +157,9 @@ class Tracker():
             self.board_rect = np.zeros_like(color_image)
             self.board_rect = cv.rectangle(self.board_rect,(self.rect_min,self.rect_min),(self.rect_max,self.rect_max),(0,255,25), 10)
         
+        # setup menu
+        self.setup_menu(color_image)
+
         # Uncomment the following to use frames with depth
         # depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
         # bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
@@ -161,10 +176,21 @@ class Tracker():
         # Uncomment the following to track a pen using haar cascade object detection
         color_image = cv.add(color_image, self.board_rect)
         color_image = self.write(color_image)
-        
+
+        # Put classified letters on frames
+        color_image = np.fliplr(color_image)
+        color_image = cv.UMat(color_image)
+        pred_str = ' '.join(self.predictions)
+        font = cv.FONT_HERSHEY_SIMPLEX
+        loc = (10, 50)
+        fontScale = 1.5
+        thickness = 3
+        color = (255, 0, 0)
+        color_image = cv.putText(color_image, pred_str, loc, font, fontScale, color, thickness, cv.LINE_AA) 
+
         # Edit self.window_images to change your preferred output frame
         # self.window_images = np.hstack((bg_removed, np.fliplr(color_image), res)) # frames for color filtering
-        self.window_images = np.fliplr(color_image)                                 # frames for haar cascade detections
+        self.window_images = color_image                                            # frames for haar cascade detections
     
     def filter_color(self, hsv):
         """ Setup mask on a frame to extract a specified color range from self.get_trackbar_val()
@@ -196,7 +222,7 @@ class Tracker():
                 image: frame used for haar cascade detections. This frame should have the same 
                         setup when cascade model is trained. The default is colored RGB image.
         """
-        detections = self.cascade.detectMultiScale(image, minSize=(20, 20), maxSize=(80,80), minNeighbors=8)
+        detections = self.cascade.detectMultiScale(image, minSize=(20, 20), maxSize=(80,80), minNeighbors=10)
         for (x,y,w,h) in detections:
             image = cv.circle(image, (x, y), 15, (255,0,0), -1)
 
@@ -262,14 +288,59 @@ class Tracker():
         return image
 
     def save_board(self):
-        """ Helper function to save writing board """
-        print("saving writing")
-        cv.imwrite('test_image.png',self.board[self.rect_min:self.rect_max, self.rect_min:self.rect_max])
+        """ Save writing board 
+        The default user image location is `user_images/`. Calling this function will 
+        save the current board as the last file in folder. 
+        """
+        # save writing board to user_images
+        path = 'user_images'
+        files = os.listdir(path)
+        num = len(files)
+        letters = string.ascii_lowercase
+        rnd_str = ( ''.join(random.choice(letters) for i in range(10)) )
+        file_name = f'{num}_{rnd_str}.png'
+        cv.imwrite(f"{path}/{file_name}",self.board[self.rect_min:self.rect_max, self.rect_min:self.rect_max])
+        print("Save writing ", file_name)
+
+        # classify letter on board
+        predicted = self.classifier.classify(file_name)
+        self.predictions.append(predicted)
+        self.pred_idx = 0
+
+        self.clear_board()
+    
+    def redo_classify(self):
+        """ Redo the last letter prediction """
+        self.predictions.pop()
+        path = 'user_images'
+        files = os.listdir(path)
+        num = len(files)
+        self.pred_idx += 1
+        predicted = self.classifier.classify(str(num-1), self.pred_idx)
+        self.predictions.append(predicted)
     
     def clear_board(self):
-        """ Helper function to completely clear wiriting board """
+        """ Completely clear wiriting board """
         self.board = None
         self.pen = [None, None]
+
+    def setup_menu(self, image):
+        """ Setup menu as an image that has the same size of image """
+        if self.insturctions is None:
+            self.insturctions = np.zeros_like(image, np.uint8)
+            self.insturctions = cv.UMat(self.insturctions)
+            font = cv.FONT_HERSHEY_SIMPLEX
+            fontScale = 0.7
+            thickness = 1
+            color = (255, 255, 255)
+            text = ["Press 'Esc' or 'q' to exit", 
+                    "Press 'c' to completely clear board",
+                    "Move away from camera to lift pen",
+                    "Press 's' to save board and classify letter",
+                    "Press 'n' to indicate wrong prediction and redo"]
+            self.insturctions = cv.putText(self.insturctions, "Insutrctions:", (20, 50), font, 1, color, 2, cv.LINE_AA) 
+            for i, t in enumerate(text):
+                self.insturctions = cv.putText(self.insturctions, t, (20, 90+30*i), font, fontScale, color, thickness, cv.LINE_AA)  
 
 
 def main():
