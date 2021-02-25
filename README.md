@@ -43,14 +43,14 @@ also included below.
         at `<root/p>`. To obtain a good result, a ratio of 2:1 for postive:negative image counts is suggested. Be sure 
         that distorted or cropped objects are also captured.
     3. Create a folder named `cascade`. The folder structure should now be:    
-            ```
-            <root>   
-                    /cascade   
-                    /n   
-                    /p   
-                    codes.py   
-                    neg.txt   
-            ```
+        ``` 
+        <root>   
+            /cascade   
+            /n   
+            /p   
+            codes.py   
+            neg.txt   
+        ```
     3. Run the following commands one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
 
         a. Annotate images stored in `<root/p>`. Follow instructions to draw bounding boxes of objects to detect.
