@@ -25,13 +25,18 @@ tracked portion is shown below.
 
 The haar cascade model is stored in `cascade/cascade.xml`. Run `object_detection.py` to visualize the performance 
 of this model. `data_gen.py` provides helper functions and scripts to train a model. 
-How to haar cascade model for a custom object:
+
+#### How to train  a haar cascade model for a custom object:
 - Useful links:
+
     [Official Opencv document on training](https://docs.opencv.org/3.4/dc/d88/tutorial_traincascade.html)
+
     [Tutorial by Naotoshi Seo to train a model to detect faces](http://note.sonots.com/SciSoftware/haartraining.html)
+
     [Tutorial to train a model used in gaming](https://www.youtube.com/watch?v=XrCAvs9AePM)
 
 - Instructions: 
+
     1. Create a folder named `n`. Capture a folder of negative images by pressing `s` when running `object_detection.py` 
         at `<root/n>`. If number of negative images is not satisfying, use the helper function `download_neg_images()` 
         provided in `data_gen.py` to download images specified in `keywords` from Bing. Run `data_gen.py` to write `neg.txt` that stores path to negative images to be used in training.
