@@ -15,16 +15,17 @@ This project is going classify words written in air in front of a depth camera.
 1. Machine Learning - [PyTorch Letter Classification](#pytorch-letter-classification)
 2. Computer Vision - [Haar Cascade Object Detection](#haar-cascade-object-detection)
 
-### PyTorch Letter Classification
+## PyTorch Letter Classification
 
-### Haar Cascade Object Detection
+## Haar Cascade Object Detection
 This project uses haar cascade train and detect functions provided by opencv to track a pen. The image of the 
 tracked portion is shown below.
 
 ![pen]()
 
 The haar cascade model is stored in `cascade/cascade.xml`. Run `object_detection.py` to visualize the performance 
-of this model. `data_gen.py` provides helper functions and scripts to train a model. 
+of this model. To train a custom haar cascade, `data_gen.py` provides helper functions. The instruction is
+also included below.  
 
 #### How to train  a haar cascade model for a custom object:
 - Useful links:
@@ -47,10 +48,15 @@ of this model. `data_gen.py` provides helper functions and scripts to train a mo
         The folder structure should now be:
             ```
             <root>
+
                 /cascade
+            
                 /n
+            
                 /p
+            
                 codes.py
+            
                 neg.txt
             ```
     3. Run the following commands one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
