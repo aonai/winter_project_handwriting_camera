@@ -53,9 +53,9 @@ of this model. `data_gen.py` provides helper functions and scripts to train a mo
                 codes.py
                 neg.txt
             ```
-    3. Run the following command lines one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
+    3. Run the following commands one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
 
-        a. Annotate images stored in <root/p>. Follow instructions to draw bounding boxes of objects to detect.
+        a. Annotate images stored in `<root/p>`. Follow instructions to draw bounding boxes of objects to detect.
         `<path_to_opencv_source_code>/build/bin/opencv_annotation --annotations=pos.txt --images=p/`
         
         b. Write pos.vec from pos.txt. 
@@ -64,11 +64,13 @@ of this model. `data_gen.py` provides helper functions and scripts to train a mo
         `<path_to_opencv_source_code>/build/bin/opencv_createsamples -info pos.txt -w 24 -h 24 -num 2000 -vec pos.vec`
         
         c. Start training. 
-        `numPos` should be number of positive images to be used in training. This number should be around 90% of 
+        `numPos` is number of positive images to be used in training. This number should be around 90% of 
         postive image counts.
         `numNeg` should be a number larger than negative image counts.
-        `numStages` defined number of stages used during training. Increasing this number will increase accuracy of model
+        `numStages` defines number of stages used during training. Increasing this number will increase accuracy of model
             but will also increase training time.
-        `w` and `h` are width and heights should be the same as the ones used in the previous command.
+        `w` and `h` are width and heights. These should be the same as the ones used in the previous command.
         `<path_to_opencv_source_code>/build/bin/opencv_traincascade -data cascade/ -vec pos.vec -bg neg.txt -numPos 900 -numNeg 600 -numStages 20 -w 24 -h 24`
+    
+    4. Replace the `cascade/cascade.xml` with customized model to have `object_detection.py` and `tracker.py` track the custome object. 
    
