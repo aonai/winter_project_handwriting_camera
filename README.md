@@ -42,15 +42,14 @@ also included below.
     2. Create a folder named `p`. Capture a folder of postive images by pressing `s` when running `object_detection.py` 
         at `<root/p>`. To obtain a good result, a ratio of 2:1 for postive:negative image counts is suggested. Be sure 
         that distorted or cropped objects are also captured.
-    3. Create a folder named `cascade`.    
-        The folder structure should now be:
+    3. Create a folder named `cascade`. The folder structure should now be:    
             ```
             <root>   
-                /cascade   
-                /n   
-                /p   
-                codes.py   
-                neg.txt   
+                    /cascade   
+                    /n   
+                    /p   
+                    codes.py   
+                    neg.txt   
             ```
     3. Run the following commands one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
 
