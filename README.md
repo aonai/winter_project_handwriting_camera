@@ -30,11 +30,9 @@ also included below.
 #### How to train  a haar cascade model for a custom object:
 - Useful links:
 
-    [Official Opencv document on training](https://docs.opencv.org/3.4/dc/d88/tutorial_traincascade.html)
-
-    [Tutorial by Naotoshi Seo to train a model to detect faces](http://note.sonots.com/SciSoftware/haartraining.html)
-
-    [Tutorial to train a model used in gaming](https://www.youtube.com/watch?v=XrCAvs9AePM)
+    [Official Opencv document on training](https://docs.opencv.org/3.4/dc/d88/tutorial_traincascade.html)   
+    [Tutorial by Naotoshi Seo to train a model to detect faces](http://note.sonots.com/SciSoftware/haartraining.html)   
+    [Tutorial to train a model used in gaming](https://www.youtube.com/watch?v=XrCAvs9AePM)   
 
 - Instructions: 
 
@@ -47,17 +45,12 @@ also included below.
     3. Create a folder named `cascade`.    
         The folder structure should now be:
             ```
-            <root>
-
-                /cascade
-            
-                /n
-            
-                /p
-            
-                codes.py
-            
-                neg.txt
+            <root>   
+                /cascade   
+                /n   
+                /p   
+                codes.py   
+                neg.txt   
             ```
     3. Run the following commands one by one at `<root>` to train a model. Notice that these commands are only available for opencv version 3.14 or lower, so it is adviced to make this version of opencv library from source. 
 
