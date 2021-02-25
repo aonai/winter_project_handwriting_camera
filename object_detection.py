@@ -123,7 +123,7 @@ class Detection():
         self.idx += 1
         letters = string.ascii_lowercase
         rnd_str = ( ''.join(random.choice(letters) for i in range(10)) )
-        cv.imwrite(f'tmp/image_{self.idx}_{rnd_str}.png',self.image_to_save)
+        cv.imwrite(f'image_{self.idx}_{rnd_str}.png',self.image_to_save)
         
         # change 0.5 to other seconds if wish to call this function at a different time loop
         self.next_call = self.next_call+0.5     
