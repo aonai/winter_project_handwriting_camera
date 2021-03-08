@@ -12,8 +12,8 @@ kernel = np.ones((5,5),np.uint8)
 # ------------ members for streaming -----------
 pipeline = rs.pipeline()
 config = rs.config()
-config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 30)
-config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
+config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 60)
+config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 60)
 profile = pipeline.start(config)
 
 class Detection():
@@ -21,7 +21,6 @@ class Detection():
     Use this class to visualize the performance of haar cascade model or save 
     frames to be used in training.
     Follow instructions specified in data_gen.py to train a haar cascade model.
-
     Press 's' to start saving choosen frames (defined in self.image_to_save) for each 0.5 sec.
     """
     def __init__(self):
@@ -74,7 +73,6 @@ class Detection():
         """ Setup window images to be shown 
         Align depth and colored frames received from intel realsense depth camera, then start tracking a pen
         either using haar cascade object detections.
-
         Edit `self.window_images` here to change output frame preference.
         Edit `self.image_to_save` to change prefereed frames for training.
         """ 
@@ -104,12 +102,11 @@ class Detection():
         Edit `minNeighbors` in `detectMultiScale` to filterout low possibility detections. Increase this number will 
         likely to decrease noises, but true positive images may also be lost.
         Edit `scaleFactor` in `detectMultiScale` to define scaling factor of objects. 
-
             Args: 
                 color_image: frame used for haar cascade detections. This frame should have the same 
                         setup when cascade model is trained. The default is colored RGB image.
         """
-        detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(80,80), minNeighbors=10)
+        detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(5000,50000), minNeighbors=8)
         for (x,y,w,h) in detections:
             color_image = cv.rectangle(color_image,(x,y),(x+w,y+h),(255,0,0), 2)
         return color_image

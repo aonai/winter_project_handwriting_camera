@@ -9,15 +9,13 @@ import os, random, string
 # ------------- variables ---------------
 frame_width = 640
 frame_height = 480
-kernel = np.ones((5,5),np.uint8)
+frame_rate = 60
 
-# ------------ members for streaming -----------
 pipeline = rs.pipeline()
 config = rs.config()
-config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, 30)
-config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, 30)
+config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, frame_rate)
+config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, frame_rate)
 profile = pipeline.start(config)
-
 
 class Tracker():
     """ Class to handle realsen camera vision 
@@ -25,15 +23,22 @@ class Tracker():
     range using trackbars, track a pen by either color filtering or haar cascade detections to
     writing on the frames, and finally output preditected letters written on the frames. 
     """
-    def __init__(self):
+    def __init__(self, use_web_cam = False, use_default_model = True, model_path = None):
+       
+        self.use_web_cam =  use_web_cam
+        self.pipeline = cv.VideoCapture(0) if use_web_cam else pipeline
+        # self.backSub = cv.createBackgroundSubtractorKNN()
+        
         # variables for depth camera
         self.background_color = 255
         self.clipping_distance_in_meters = 0.4
         self.min_distance_in_meters = 0
         self.pen_min_distance = 2.5
+        self.fps = 0
 
         # variable for pen tracking
         self.pen = [None, None]
+        self.pen_bound = [[frame_width, frame_height], [0,0]]
         self.pen_x = []
         self.pen_y = []
         self.board = None
@@ -42,9 +47,12 @@ class Tracker():
         self.rect_max = (int(frame_height*4/5))
         self.write_time = time.time()        
         self.cascade=cv.CascadeClassifier("cascade/cascade.xml")
+        self.last_call = time.time()
+        self.pen_color = (255,255,255)
+        self.pen_size = 20
 
         # pytorch classifier
-        self.classifier = Classifier()
+        self.classifier = Classifier() if use_default_model else Classifier(model_path)
         self.predictions = []
         self.pred_idx = 0
 
@@ -53,23 +61,26 @@ class Tracker():
         self.window_images = None
 
         # initialize
-        self.setup_stream()
+        if (not self.use_web_cam) : self.setup_stream()
         cv.namedWindow(self.window_name, cv.WINDOW_AUTOSIZE)
         self.insturctions = None
 
-        # Uncomment the following to define range of color to filter using trackbar
-        # self.enable_trackbar() 
-        
+
+        self.start_time = time.time()
         while True:
             self.setup_window()
-            cv.imshow("Instructions", self.insturctions)
+            # cv.imshow("Instructions", self.insturctions)
             cv.imshow(self.window_name, self.window_images)
-
+            
             # ---------  keys ----------------
             key = cv.waitKey(1)
             if key & 0xFF == ord('q') or key == 27:
                 # Press esc or 'q' to close the image window
                 cv.destroyAllWindows()
+                if (use_web_cam):
+                    self.pipeline.release()
+                else:
+                    self.pipeline.stop()
                 break
             elif key & 0xFF == ord('s'):
                 self.save_board()
@@ -79,6 +90,16 @@ class Tracker():
             elif key & 0xFF == ord('n'):
                 print("Redo prediction")
                 self.redo_classify()
+            elif key & 0xFF == ord('e'):
+                if self.pen_size == 20:
+                    print("Eraser")
+                    self.pen = [None, None]
+                    self.pen_color = (0, 0, 0)
+                else:
+                    print("Pen")
+                    self.pen_color = (255,255, 255)
+
+
                 
     def setup_stream(self):
         """ Setup streaming for realsense camera """
@@ -138,27 +159,35 @@ class Tracker():
         Calling self.write or self.write_color_filter can start writing with a pen in front of the camera.
         """ 
         # get frames 
-        frames = pipeline.wait_for_frames()
-        aligned_frames = self.align.process(frames)
-        aligned_depth_frame = aligned_frames.get_depth_frame() 
-        self.depth_frame = aligned_depth_frame
-        color_frame = aligned_frames.get_color_frame()
+        if (not self.use_web_cam):
+            frames = self.pipeline.wait_for_frames()
+            num_frames = frames.get_frame_number()
+            self.fps = num_frames/(time.time() - self.start_time)
+            
+            aligned_frames = self.align.process(frames)
+            aligned_depth_frame = aligned_frames.get_depth_frame() 
+            self.depth_frame = aligned_depth_frame
+            color_frame = aligned_frames.get_color_frame()
 
-        if not aligned_depth_frame or not color_frame: 
-            raise Exception("WARNING: Frame not found")
+            if not aligned_depth_frame or not color_frame: 
+                raise Exception("WARNING: Frame not found")
 
-        # get camera images
-        depth_image = np.asanyarray(aligned_depth_frame.get_data())
-        color_image = np.asanyarray(color_frame.get_data())
-        
-        # setup bounding box for writing
+            # get camera images
+            depth_image = np.asanyarray(aligned_depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+        else:
+            ret, color_image = self.pipeline.read()
+
+        # setup board for writing
         if self.board is None:
             self.board = np.zeros_like(color_image)
-            self.board_rect = np.zeros_like(color_image)
-            self.board_rect = cv.rectangle(self.board_rect,(self.rect_min,self.rect_min),(self.rect_max,self.rect_max),(0,255,25), 10)
+        self.board_rect = np.zeros_like(color_image)
+        self.board_rect = cv.rectangle(self.board_rect,(self.pen_bound[0][0]-50,self.pen_bound[0][1]-50), \
+                                        (self.pen_bound[1][0]+50,self.pen_bound[1][1]+50),(0,255,25), 10)
         
         # setup menu
-        self.setup_menu(color_image)
+        # self.setup_menu(color_image)
+        # cv.imwrite("instructions.png", self.insturctions)
 
         # Uncomment the following to use frames with depth
         # depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
@@ -166,15 +195,16 @@ class Tracker():
         #                     self.background_color, color_image)
              
         # Uncomment the following to track a pen by filtering coler, should be used with depth frames
-        # hsv = cv.cvtColor(bg_removed, cv.COLOR_BGR2HSV)
+        # color_image = self.back_sub(color_image)
+        # hsv = cv.cvtColor(color_image, cv.COLOR_BGR2HSV)
         # mask = self.filter_color(hsv)
         # color_image = cv.add(color_image, self.board_rect)
         # color_image = self.write_color_filter(mask, color_image)
         # mask_bw = cv.cvtColor(mask, cv.COLOR_GRAY2BGR) # back and white images 
-        # res = cv.bitwise_and(bg_removed, bg_removed, mask=mask)
+        # res = cv.bitwise_and(color_image, color_image, mask=mask)
 
         # Uncomment the following to track a pen using haar cascade object detection
-        color_image = cv.add(color_image, self.board_rect)
+        # color_image = cv.add(color_image, self.board_rect)
         color_image = self.write(color_image)
 
         # Put classified letters on frames
@@ -187,11 +217,29 @@ class Tracker():
         thickness = 3
         color = (255, 0, 0)
         color_image = cv.putText(color_image, pred_str, loc, font, fontScale, color, thickness, cv.LINE_AA) 
+        color_image = cv.putText(color_image, f"fps = {str(self.fps)}", (frame_width-200, frame_height-30), 
+                                    font, 1, (0, 255, 255), 1, cv.LINE_AA) 
 
         # Edit self.window_images to change your preferred output frame
         # self.window_images = np.hstack((bg_removed, np.fliplr(color_image), res)) # frames for color filtering
         self.window_images = color_image                                            # frames for haar cascade detections
     
+    def back_sub(self, frame):
+        """ Background subtraction
+        https://automaticaddison.com/how-to-apply-a-mask-to-an-image-using-opencv/
+        """
+        mask = self.backSub.apply(frame)
+        mask_inv = cv.bitwise_not(mask)
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        rows, cols, channels = frame.shape
+        frame = frame[0:rows, 0:cols]
+        colored_portion = cv.bitwise_or(frame, frame, mask = mask)
+        colored_portion = colored_portion[0:rows, 0:cols]
+        gray_portion = cv.bitwise_or(gray, gray, mask = mask_inv)
+        gray_portion = np.stack((gray_portion,)*3, axis=-1)
+        output = colored_portion + gray_portion
+        return output
+
     def filter_color(self, hsv):
         """ Setup mask on a frame to extract a specified color range from self.get_trackbar_val()
         
@@ -222,12 +270,11 @@ class Tracker():
                 image: frame used for haar cascade detections. This frame should have the same 
                         setup when cascade model is trained. The default is colored RGB image.
         """
-        detections = self.cascade.detectMultiScale(image, minSize=(20, 20), maxSize=(80,80), minNeighbors=10)
+        detections = self.cascade.detectMultiScale(image, minSize=(30, 30), maxSize=(80, 80), minNeighbors=10)
         for (x,y,w,h) in detections:
-            image = cv.circle(image, (x, y), 15, (255,0,0), -1)
-
-            if x < self.rect_max and x > self.rect_min and y < self.rect_max and y > self.rect_min \
-                and self.depth_frame.get_distance(int(x+w/2), int(y+h/2)) < self.pen_min_distance:
+            image = cv.rectangle(image,(x,y),(x+w,y+h),(255,0,0), 2)
+            if self.pen[0] is None or (abs(self.pen[1][0]-x)<=2*w and abs(self.pen[1][1]-y)<=2*h):
+                image = cv.circle(image, (x, y), 15, (255,0,0), -1)
                 if self.pen[0] is None:
                     self.pen[0] = (x, y)
                     self.pen[1] = (x, y)
@@ -238,11 +285,15 @@ class Tracker():
                 if time.time() - self.write_time  > 1:
                     self.pen = [None, None]
                 self.write_time = time.time()
+                break   
 
-            break
         # write 
         if not self.pen[0] is None:
-            self.board = cv.line(self.board, self.pen[0], self.pen[1], (255,255, 255), 20)
+            self.board = cv.line(self.board, self.pen[0], self.pen[1], self.pen_color, self.pen_size)
+            self.pen_bound[0][0] = min(self.pen_bound[0][0], self.pen[1][0])
+            self.pen_bound[0][1] = min(self.pen_bound[0][1], self.pen[1][1])
+            self.pen_bound[1][0] = max(self.pen_bound[1][0], self.pen[1][0])
+            self.pen_bound[1][1] = max(self.pen_bound[1][1], self.pen[1][1])
             image = cv.add(image, self.board)
         return image
     
@@ -262,29 +313,32 @@ class Tracker():
                 image: frame to show writing on.
         """
         contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 800:
+        if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 500:
             c = max(contours, key=cv.contourArea)
             x, y, w, h = cv.boundingRect(c)
             cv.rectangle(image, (x, y), (x+w, y+h), (0,25, 255), 2)
 
-            if x < self.rect_max and x > self.rect_min and y < self.rect_max and y > self.rect_min:
-                self.pen_x.append(x)
-                self.pen_y.append(y)
-            else:
-                self.pen_x = []
-                self.pen_y = []
+            self.pen_x.append(x)
+            self.pen_y.append(y)
 
             # average pen location on each 10 frames
-            if len(self.pen_x) == 10:
+            if len(self.pen_x) == 2:
                 self.pen[0] = self.pen[1]
                 self.pen[1] = (int(np.average(self.pen_x)), int(np.average(self.pen_y)))
                 self.pen_x = []
                 self.pen_y = []
-        # write
-        if not self.pen[0] is None:
-            self.board = cv.line(self.board, self.pen[0], self.pen[1], (255,255, 255), 20)
-            image = cv.add(image, self.board)
-
+            # write
+            if not self.pen[0] is None:
+                self.board = cv.line(self.board, self.pen[0], self.pen[1], (255,255, 255), 20)
+                self.pen_bound[0][0] = min(self.pen_bound[0][0], self.pen[1][0])
+                self.pen_bound[0][1] = min(self.pen_bound[0][1], self.pen[1][1])
+                self.pen_bound[1][0] = max(self.pen_bound[1][0], self.pen[1][0])
+                self.pen_bound[1][1] = max(self.pen_bound[1][1], self.pen[1][1])
+                print("Bound = ", self.pen_bound)
+    
+        else:
+            self.pen = [None, None]
+        image = cv.add(image, self.board)
         return image
 
     def save_board(self):
@@ -299,11 +353,18 @@ class Tracker():
         letters = string.ascii_lowercase
         rnd_str = ( ''.join(random.choice(letters) for i in range(10)) )
         file_name = f'{num}_{rnd_str}.png'
-        cv.imwrite(f"{path}/{file_name}",self.board[self.rect_min:self.rect_max, self.rect_min:self.rect_max])
+        thresh = 50
+        from_x = self.pen_bound[0][0] - thresh
+        from_y = self.pen_bound[0][1] - thresh
+        to_x = self.pen_bound[1][0] + thresh
+        to_y = self.pen_bound[1][1] + thresh
+        board_to_save = self.board[from_y:to_y, from_x:to_x]
+        cv.imwrite(f"{path}/{file_name}", board_to_save)
         print("Save writing ", file_name)
 
         # classify letter on board
         predicted = self.classifier.classify(file_name)
+        print("Prediction = ", predicted)
         self.predictions.append(predicted)
         self.pred_idx = 0
 
@@ -318,11 +379,14 @@ class Tracker():
         self.pred_idx += 1
         predicted = self.classifier.classify(str(num-1), self.pred_idx)
         self.predictions.append(predicted)
+
+
     
     def clear_board(self):
         """ Completely clear wiriting board """
         self.board = None
         self.pen = [None, None]
+        self.pen_bound = [[frame_width, frame_height], [0,0]]
 
     def setup_menu(self, image):
         """ Setup menu as an image that has the same size of image """
@@ -337,7 +401,8 @@ class Tracker():
                     "Press 'c' to completely clear board",
                     "Move away from camera to lift pen",
                     "Press 's' to save board and classify letter",
-                    "Press 'n' to indicate wrong prediction and redo"]
+                    "Press 'n' to indicate wrong prediction and redo",
+                    "Press 'y' to save letter to model"]
             self.insturctions = cv.putText(self.insturctions, "Insutrctions:", (20, 50), font, 1, color, 2, cv.LINE_AA) 
             for i, t in enumerate(text):
                 self.insturctions = cv.putText(self.insturctions, t, (20, 90+30*i), font, fontScale, color, thickness, cv.LINE_AA)  
@@ -345,12 +410,12 @@ class Tracker():
 
 def main():
     """ The main() function. """
-    tracker = Tracker()
+    tracker = Tracker(use_web_cam = False,  use_default_model = False, model_path = "models/model_letters.pth")
 
 if __name__=="__main__": 
     try:
         main()
     except Exception as inst:
-            print(inst)
+        print(inst)
     finally:
-        pipeline.stop()
+        print("Pipeline End")
