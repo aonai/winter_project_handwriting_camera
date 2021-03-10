@@ -32,10 +32,10 @@ The main goal of this project is to classify letters written in front of a depth
 ## PyTorch Letter Classification
 ## Track Colored Pen
 ## Haar Cascade Object Detection
-This project uses haar cascade train and detects functions provided by OpenCV to track a pen. The pen used for tracking is bought from  [yoobi](https://yoobi.com/collections/pens/products/scented-gel-pens-6-pack-fruit). To ensure that the pen is easily classifiable, a distinctive portion of the pen is chosen as the object to detect. The tracked portion is bounded by a red box in the image shown on the right below. 
+This project uses haar cascade train and detect functions provided by OpenCV to track a pen. The pen used for tracking is bought from  [yoobi](https://yoobi.com/collections/pens/products/scented-gel-pens-6-pack-fruit). To ensure that the pen is easily classifiable, a distinctive portion of the pen is chosen as the object to detect. The tracked portion is bounded by a red box in the image shown on the right below. 
 <img src="https://cdn.shopify.com/s/files/1/0445/6817/products/TARGET_INLINE_MARCH_2020-4410-CROPPED_1000x.jpg?v=1582241292" height="250" alt="Pen" style="margin-left:50px">   <img src="demo/tracked_pen.png" height="250" alt="Pen" style="margin-left:50px">
 
-The Haar Cascade model used in this project is trained using around 1,000 positive images and 500 negative images. The classifier is able to correctly detect the pen in front of the camera; however, it will occasionally misclassify other objects (such as fingers or shadows of similar shape) as the pen. To solve this problem without having to retrain the model with more images, the code assumes that only one object is detected at each frame and that 10 objects need to be detected before defining it as the pen (this is defined by the `minNeighbors` parameter of the `detectMultiScale` function. The code also bounds the size of detection between 30x30 and 80x80 pixels. With these conditions, small noises are neglected, but it also has the risk of not recognizing the pen due to large `minNeighbors`. This problem is solved by increasing the frame rate. 
+The Haar Cascade model used in this project is trained using around 1,000 positive images and 500 negative images. The classifier is able to correctly detect the pen in front of the camera; however, it will occasionally misclassify other objects (such as fingers or shadows of similar shape) as the pen. To solve this problem without having to retrain the model with more images, the code assumes that only one object is detected at each frame and that 10 objects need to be detected before defining it as the pen (this is defined by the `minNeighbors` parameter of the `detectMultiScale` function). The code also bounds the size of detection between 30x30 and 80x80 pixels. With these conditions, small noises are neglected, but it also has the risk of not recognizing the pen due to large `minNeighbors`. This problem is solved by increasing the frame rate. 
 
 `tracker.py` processes color frames from depth camera at a frame rate of 60 fps. The performance is better than running at 30 fps (The comparison can be seen below or from `object_detection.py` which is set to be at 30 fps). However, more false detections are found in this case, so `tracker.py` adds in another condition that if the current detection is around twice width or twice height pixels away from the previous detection, then this detection is considered incorrect. The images below show `tracker.py` running at 30fps (left) and 60fps (right) respectively.
 
@@ -43,7 +43,7 @@ The Haar Cascade model used in this project is trained using around 1,000 positi
 
 #### Related Files
 - `cascade/cascade.xml` - the haar cascade model that detects the green yoobi pen
-- `object_detection.py` - code to visualize the performance of the haar cascade model. \
+- `object_detection.py` - code to visualize the performance of the haar cascade model. 
 - `data_gen.py` - helper functions for training a custom haar cascade  
 
 #### How to train  a haar cascade model for a custom object:
@@ -94,7 +94,7 @@ The Haar Cascade model used in this project is trained using around 1,000 positi
 ## Combine Classifier with Opencv Frames  
 
 ## Configure Virtual Camera
-The resulting outputs of this project can be stream on to a virtual camera so that Zoom (or Skype etc.) can display the processed frames.This function can be set available set callling `tracker = Tracker( enable_stream = True)`, then follow the instruction below to start streaming. Notice that these commands are only for Linux system.
+The resulting outputs of this project can be streamed onto a virtual camera so that Zoom (or Skype etc.) can display the processed frames.This function can be set available by callling `tracker = Tracker( enable_stream = True)` in `main` of `tracker.py`. Then, follow the instruction below to start streaming. Notice that these commands are only for Linux system.
 1. Configure two virtual cameras loopbacks for `Tracker`
     ```
     sudo modprobe v4l2loopback devices=2 video_nr=10,11 card_label="Tracker_1","Tracker_2"
@@ -114,8 +114,10 @@ The resulting outputs of this project can be stream on to a virtual camera so th
     ```
 
 3. Test with Gstreamer.   
-`gst-launch-1.0 videotestsrc ! v4l2sink device=/dev/video10   `
-Example output:
+    ```
+    gst-launch-1.0 videotestsrc ! v4l2sink device=/dev/video10   
+    ```
+    Example output:
     ```
     Setting pipeline to PAUSED ...
     Pipeline is PREROLLING ...
@@ -128,15 +130,15 @@ Example output:
     ```
     vlc v4l2:///dev/video11
     ```
-The video shown on `/dev/video11` should now be the same as the output frames of `tracker.py`
+    The video shown on `/dev/video11` should now be the same as the output frames of `tracker.py`
 
-5. Stream to another virual cam.   
+5. Stream to another virtual camera loopback.   
     ```
     ffmpeg -f v4l2 -r 60 -s 640x480 -i /dev/video11 -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video10
     ```
-6. Open Zoom and select `Tracker_1`. Now the video displayed should be the same as resulting frames of `tracker.py`.
+6. Open Zoom and select `Tracker_1`. Now the video displayed should be the same as the resulting frames of `tracker.py`.
 
-7. When finish with the project, remove loopback devices 
+7. When finished with the project, remove loopback devices 
     ```  
     sudo modprobe -r v4l2loopback   
     ```
