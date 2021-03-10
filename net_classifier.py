@@ -9,6 +9,7 @@ import os
 import natsort
 import cv2 
 from PIL import Image
+import matplotlib.pyplot as plt
 
 
 class Expand(object):
@@ -51,7 +52,13 @@ class Net(nn.Module):
 
 
 class UserImageDataSet(Dataset):
-    """ Helper class to load image from a given path at `root_dit` """
+    """ Helper class to load image from a given path at `root_dit` 
+   
+        Args: 
+            root_dir: root directory of user images 
+                    image file names should be in format <index>_<random_string>.png
+            transform: transform to images
+    """
     def __init__(self, root_dir, transform):
         self.root_dir = root_dir
         self.transform = transform
@@ -72,6 +79,68 @@ class UserImageDataSet(Dataset):
                 image = self.transform(image)
                 return image
 
+class UserKnownImageDataSet(Dataset):
+    """ Helper class to load a dateset from a given path at `root_dit` 
+
+        Args: 
+            root_dir: root directory of labeled images 
+                    image file names should be in format <index>_<label>_<random_string>.png
+            transform: transform to images
+        
+        Example usage:
+            # Setup transform, this is the default transform for images captured from `tracker.py`
+            transform = transforms.Compose(
+                                    [transforms.ToTensor(),
+                                    transforms.Resize(25),
+                                    Expand(28),
+                                    transforms.Normalize((0.5), (0.5))])
+            
+            # Load labeled data 
+            user_dataset = UserKnownImageDataSet('user_dataset', transform=transform)
+            user_loader = torch.utils.data.DataLoader(user_dataset , batch_size=4, shuffle=False)
+            dataiter = iter(user_loader)
+            images, labels = dataiter.next()
+
+            # Print images
+            # Notice that the labels are returned as integers, so use the following list to 
+            # convert between index and char. The first member in classes is meaningless.
+            classes = [chr(i) for i in range(64,91)] 
+            fig, ax = plt.subplots(4,1)
+            fig.tight_layout(pad=2.0)
+            for i, img in enumerate(images):
+                npimg = img.numpy()
+                npimg = np.fliplr(npimg)
+                npimg = np.rot90(npimg, axes=(-1,-2))
+                npimg = np.transpose(npimg, (1, 2, 0))
+
+                ax[i].imshow(npimg)
+                ax[i].title.set_text(classes[labels[i]])
+            plt.show()
+
+    """
+    def __init__(self, root_dir, transform):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.all_imgs = os.listdir(root_dir)
+        self.total_imgs = natsort.natsorted(self.all_imgs)
+        self.classes = [chr(i) for i in range(64,91)] 
+
+    def __len__(self):
+        return len(self.total_imgs)
+
+    def __getitem__(self, idx):
+        for filename in self.all_imgs:
+            if filename.split('_')[0] == str(idx):
+                path = os.path.join(self.root_dir, filename)
+                image = cv2.imread(path,cv2.IMREAD_GRAYSCALE)
+                image = np.rot90(image, axes=(0,1))
+                image = cv2.resize(image, (28,28))
+                image = Image.fromarray(image)
+                image = self.transform(image)
+
+                label = filename.split('_')[1]
+
+                return image, torch.tensor(self.classes.index(label))
 
 class Classifier():
     """ Class to classify a letter writen on a 24x24 image
@@ -121,5 +190,3 @@ class Classifier():
                 output[max_idx] = min(output)-1
             predicted = output.index(max(output))
             return self.classes[predicted]
-
-
