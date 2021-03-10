@@ -3,8 +3,14 @@ import numpy as np
 import pyrealsense2 as rs
 import time
 from net_classifier import Classifier
-import os, random, string
-
+import os, random, string 
+from shutil import copyfile
+import sys
+import fcntl
+from v4l2 import (
+    v4l2_format, VIDIOC_G_FMT, V4L2_BUF_TYPE_VIDEO_OUTPUT, V4L2_PIX_FMT_RGB24,
+    V4L2_FIELD_NONE, VIDIOC_S_FMT
+)
 
 # ------------- variables ---------------
 frame_width = 640
@@ -23,7 +29,8 @@ class Tracker():
     range using trackbars, track a pen by either color filtering or haar cascade detections to
     writing on the frames, and finally output preditected letters written on the frames. 
     """
-    def __init__(self, use_web_cam = False, use_default_model = True, model_path = None):
+    def __init__(self, use_web_cam = False, use_default_model = True, model_path = None,  
+                    enable_stream = False, virtual_cam = "/dev/video11"):
        
         self.use_web_cam =  use_web_cam
         self.pipeline = cv.VideoCapture(0) if use_web_cam else pipeline
@@ -55,6 +62,8 @@ class Tracker():
         self.classifier = Classifier() if use_default_model else Classifier(model_path)
         self.predictions = []
         self.pred_idx = 0
+        self.image_path ='user_images'
+        self.image_dataset = 'user_dataset'
 
         # variables for opencv frames
         self.window_name = "Track Pen"
@@ -65,6 +74,10 @@ class Tracker():
         cv.namedWindow(self.window_name, cv.WINDOW_AUTOSIZE)
         self.insturctions = None
 
+        # setup streaming
+        if enable_stream: 
+            self.virtual_cam = virtual_cam
+            self.setup_virtual_cam()
 
         self.start_time = time.time()
         while True:
@@ -72,6 +85,17 @@ class Tracker():
             # cv.imshow("Instructions", self.insturctions)
             cv.imshow(self.window_name, self.window_images)
             
+            if enable_stream: 
+                # Convert frame to RGB format
+                virtual_image = cv.UMat.get(self.window_images)
+                virtual_image = cv.cvtColor(virtual_image, cv.COLOR_BGR2RGB)
+                # write to output virtual cam loopback
+                written = os.write(self.virtual_cam_output, virtual_image.data)
+                if written < 0:
+                    print("ERROR: could not write to output device!")
+                    os.close(self.virtual_cam_output)
+                    break
+
             # ---------  keys ----------------
             key = cv.waitKey(1)
             if key & 0xFF == ord('q') or key == 27:
@@ -83,7 +107,14 @@ class Tracker():
                     self.pipeline.stop()
                 break
             elif key & 0xFF == ord('s'):
+                print("Classify")
                 self.save_board()
+            elif key & 0xFF == ord('a'):
+                print("Save to model")
+                self.save_model()
+            elif key & 0xFF == ord('w'):
+                print("Clear predictions")
+                self.predictions = []
             elif key & 0xFF == ord('c'):
                 print("Clear board")
                 self.clear_board()
@@ -95,10 +126,45 @@ class Tracker():
                     print("Eraser")
                     self.pen = [None, None]
                     self.pen_color = (0, 0, 0)
+                    self.pen_size = 30
                 else:
                     print("Pen")
+                    self.pen = [None, None]
                     self.pen_color = (255,255, 255)
+                    self.pen_size = 20
 
+    def setup_virtual_cam(self):
+        """ Setup v4l2 lookback config 
+        https://arcoresearchgroup.wordpress.com/2020/06/02/virtual-camera-for-opencv-using-v4l2loopback/ 
+        """
+        print("Setup virtual camera at ", self.virtual_cam)
+        # open output device
+        try:
+            self.virtual_cam_output = os.open(self.virtual_cam, os.O_RDWR)
+        except Exception as ex:
+            print("ERROR: could not open output device!")
+            print(str(ex))
+            return -1
+
+        # configure params for output device
+        vid_format = v4l2_format()
+        vid_format.type = V4L2_BUF_TYPE_VIDEO_OUTPUT
+        if fcntl.ioctl(self.virtual_cam_output, VIDIOC_G_FMT, vid_format) < 0:
+            print("ERROR: unable to get video format!")
+            return -1
+
+        framesize = frame_width * frame_height * 3
+        vid_format.fmt.pix.width = frame_width
+        vid_format.fmt.pix.height = frame_height
+
+        # output frames need to be in rgb format
+        vid_format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24
+        vid_format.fmt.pix.sizeimage = framesize
+        vid_format.fmt.pix.field = V4L2_FIELD_NONE
+
+        if fcntl.ioctl(self.virtual_cam_output, VIDIOC_S_FMT, vid_format) < 0:
+            print("ERROR: unable to set video format!")
+            return -1
 
                 
     def setup_stream(self):
@@ -209,16 +275,18 @@ class Tracker():
 
         # Put classified letters on frames
         color_image = np.fliplr(color_image)
-        color_image = cv.UMat(color_image)
+        color_image = cv.UMat(color_image)         
         pred_str = ' '.join(self.predictions)
         font = cv.FONT_HERSHEY_SIMPLEX
-        loc = (10, 50)
+        loc = (100, 150)
         fontScale = 1.5
         thickness = 3
         color = (255, 0, 0)
         color_image = cv.putText(color_image, pred_str, loc, font, fontScale, color, thickness, cv.LINE_AA) 
-        color_image = cv.putText(color_image, f"fps = {str(self.fps)}", (frame_width-200, frame_height-30), 
-                                    font, 1, (0, 255, 255), 1, cv.LINE_AA) 
+        # Uncomment the following line to print fps on window
+        # color_image = cv.putText(color_image, f"fps = {str(self.fps)}", (frame_width-200, frame_height-30), 
+        #                             font, 1, (0, 0, 255), 1, cv.LINE_AA) 
+        
 
         # Edit self.window_images to change your preferred output frame
         # self.window_images = np.hstack((bg_removed, np.fliplr(color_image), res)) # frames for color filtering
@@ -272,9 +340,9 @@ class Tracker():
         """
         detections = self.cascade.detectMultiScale(image, minSize=(30, 30), maxSize=(80, 80), minNeighbors=10)
         for (x,y,w,h) in detections:
-            image = cv.rectangle(image,(x,y),(x+w,y+h),(255,0,0), 2)
+            # image = cv.rectangle(image,(x,y),(x+w,y+h),(255,0,0), 2)
             if self.pen[0] is None or (abs(self.pen[1][0]-x)<=2*w and abs(self.pen[1][1]-y)<=2*h):
-                image = cv.circle(image, (x, y), 15, (255,0,0), -1)
+                image = cv.circle(image, (x, y), 15, (255, 0, 0), -1)
                 if self.pen[0] is None:
                     self.pen[0] = (x, y)
                     self.pen[1] = (x, y)
@@ -347,7 +415,7 @@ class Tracker():
         save the current board as the last file in folder. 
         """
         # save writing board to user_images
-        path = 'user_images'
+        path = self.image_path
         files = os.listdir(path)
         num = len(files)
         letters = string.ascii_lowercase
@@ -373,14 +441,12 @@ class Tracker():
     def redo_classify(self):
         """ Redo the last letter prediction """
         self.predictions.pop()
-        path = 'user_images'
+        path = self.image_path
         files = os.listdir(path)
         num = len(files)
         self.pred_idx += 1
         predicted = self.classifier.classify(str(num-1), self.pred_idx)
         self.predictions.append(predicted)
-
-
     
     def clear_board(self):
         """ Completely clear wiriting board """
@@ -407,10 +473,24 @@ class Tracker():
             for i, t in enumerate(text):
                 self.insturctions = cv.putText(self.insturctions, t, (20, 90+30*i), font, fontScale, color, thickness, cv.LINE_AA)  
 
+    def save_model(self):
+        path = self.image_path
+        files = os.listdir(path)
+        num = len(files)
+        for f in files:
+            if f.startswith(str(num-1)):
+                print("old file name ", f)
+                dataset = os.listdir(self.image_dataset)
+                dataset_num = len(dataset)
+                file_name = f"{dataset_num}_{self.predictions[len(self.predictions)-1]}_{f.split('_')[1]}"
+                print("new file name ", file_name)
+                copyfile(f"{self.image_path}/{f}", f"{self.image_dataset}/{file_name}")
+
+
 
 def main():
     """ The main() function. """
-    tracker = Tracker(use_web_cam = False,  use_default_model = False, model_path = "models/model_letters.pth")
+    tracker = Tracker( enable_stream = True)
 
 if __name__=="__main__": 
     try:
