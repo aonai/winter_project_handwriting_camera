@@ -14,7 +14,10 @@ from PIL import Image
 class Expand(object):
     """ Custom pytorch transform class to fit a smaller writing image into a larger black canvas 
     This is only used when writings are bounded by a box. Right now, 
-    writings are unbounded, so this is not used.
+    writings are cropped based on max and min locations of lines on the frame. 
+
+        Args:
+            output_size: size of canvas to fit image into.
 
         Example usage:
             transform = transforms.Compose(
@@ -72,12 +75,14 @@ class Net(nn.Module):
 
 
 class UserImageDataSet(Dataset):
-    """ Helper class to load image from a given path at `root_dit` 
+    """ Helper class to load images from a given path at `root_dit` 
    
         Args: 
             root_dir: root directory of user images. 
                     image file names should be in format <index>_<random_string>.png
             transform: transform to images
+        Returns:
+            image: transformed image
     """
     def __init__(self, root_dir, transform):
         self.root_dir = root_dir
@@ -106,6 +111,9 @@ class UserKnownImageDataSet(Dataset):
             root_dir: root directory of labeled images.
                     image file names should be in format <index>_<label>_<random_string>.png
             transform: transform to images
+        Returns:
+            image: transformed image
+            label: ground truth of image
         
         Example usage:
             # Setup transform, this is the default transform for images captured from `tracker.py`
@@ -165,10 +173,12 @@ class UserKnownImageDataSet(Dataset):
                 return image, torch.tensor(self.classes.index(label))
 
 class Classifier():
-    """ Class to classify a letter writen on a 24x24 image
+    """ Class to classify a letter writen on an image.
     The background color should be black, and the text color should be white.
-    The default pytorch model is `models/model_letters.pth`.
-    The default image folder path is `user_images/`.
+
+        Args:
+            path: path to pre-trained Pytorch model. The default is `models/model_letters.pth`.
+            img_folder_path: path folder where user images are stored. The default folder is `user_images/`.
     """
     def __init__(self, path=None, img_folder_path=None):
         # upper letters A~Z; notice that the first member in this list is meaningless
@@ -190,12 +200,14 @@ class Classifier():
         """ Predict letter on an image at given name
         The image_name should be in format `<idx_in_folder>_<random_string>.png`. Calling this function
         will classify on the image that have the same index numer as <idx_in_folder> when loading 
-        files from `user_images/`.
+        files from `img_folder_path`.
 
             Args:
                 image_name: name of saved image to classify 
                 pred_idx: if pred_idx > 0, the predict letter will be the letter with
                          <pred_idx>th largest possibility from net
+            Returns:
+                prediction of letter
         """
         user_dataset = UserImageDataSet(self.img_folder_path, transform=self.transform)
         image = user_dataset[int(image_name.split('_')[0])]
@@ -212,6 +224,3 @@ class Classifier():
             predicted = output.index(max(output))
             return self.classes[predicted]
 
-# c = Classifier()
-# result = c.classify('1')
-# print(result)

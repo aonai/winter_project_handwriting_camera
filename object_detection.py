@@ -105,6 +105,8 @@ class Detection():
             Args: 
                 color_image: frame used for haar cascade detections. This frame should have the same 
                         setup when cascade model is trained. The default is colored RGB image.
+            Returns:
+                color_image: frame with bounding boxes around detected objects.
         """
         detections = self.cascade.detectMultiScale(color_image, minSize=(20, 20), maxSize=(5000,50000), minNeighbors=8)
         for (x,y,w,h) in detections:
@@ -113,6 +115,7 @@ class Detection():
 
     def save_image(self):
         """ Helper function to save image for each 0.5 seconds 
+        The following code is adapted from 
         https://stackoverflow.com/questions/8600161/executing-periodic-actions-in-python
         The frame that is saved is defined by `self.save_image`. Edit this variable at end of `self.setup_window`.
         """

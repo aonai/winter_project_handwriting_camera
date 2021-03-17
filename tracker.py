@@ -19,25 +19,26 @@ frame_rate = 60
 
 
 class Tracker():
-    """ Class to handle realsen camera vision 
-    This class should setup intel realsense camera streaming, allow setting up filter color
+    """ Class to handle camera vision 
+    This class should be able to setup intel realsense camera streaming, allow setting up filter color
     range using trackbars, track a pen by either color filtering or haar cascade detections to
-    writing on the frames, and finally output preditected letters written on the frames. 
+    writing on the frames, and finally output predicted letters written on the frames. 
 
         Args:
             use_web_cam: whether to use webcam for tracking pen.
             use_colored_pen: whether to track pen using color filtering 
             use_default_model: whether to use the default trained model `models/model_letters.pth`.
-                            if this is set to False, specify location of the customized model
+                            if this is set to False, specify a location of the customized model
                             using `model_path`.
             model_path: path to PyTorch model.
             enable_stream: whether to enable streaming to a virtual camera.
-            virtual_cam: address of virtual camera to stream to. 
+            virtual_cam: address of the virtual camera to stream to. 
                             
     """
     def __init__(self, use_web_cam = False, use_colored_pen=False, use_default_model = True, model_path = None,  
                     enable_stream = False, virtual_cam = "/dev/video11"):
        
+        # use webcam or realsense depth camera
         self.use_web_cam =  use_web_cam
         if use_web_cam:
             self.pipeline = cv.VideoCapture(0) 
@@ -55,7 +56,7 @@ class Tracker():
         self.pen_min_distance = 2.5
         self.fps = 0
 
-        # variable for pen tracking
+        # variables for pen tracking
         self.use_colored_pen = use_colored_pen
         if self.use_colored_pen:
             self.backSub = cv.createBackgroundSubtractorKNN()
@@ -97,7 +98,7 @@ class Tracker():
         self.start_time = time.time()
         while True:
             self.setup_window()
-            # cv.imshow("Instructions", self.insturctions)
+            # cv.imshow("Instructions", self.insturctions)      # Uncomment this line to show instructions
             cv.imshow(self.window_name, self.window_images)
             
             if enable_stream: 
@@ -114,7 +115,7 @@ class Tracker():
             # ---------  keys ----------------
             key = cv.waitKey(1)
             if key & 0xFF == ord('q') or key == 27:
-                # Press esc or 'q' to close the image window
+                # Press `esc` or `q` to close the image window
                 cv.destroyAllWindows()
                 if (use_web_cam):
                     self.pipeline.release()
@@ -122,21 +123,27 @@ class Tracker():
                     self.pipeline.stop()
                 break
             elif key & 0xFF == ord('s'):
+                # Press `s` to save writing and predict letter
                 print("Classify")
                 self.save_board()
             elif key & 0xFF == ord('a'):
+                # Press `a` to save current image and prediction to user dataset
                 print("Save to model")
                 self.save_model()
             elif key & 0xFF == ord('w'):
+                # Press `w` to clear predictions displayed on the screen
                 print("Clear predictions")
                 self.predictions = []
             elif key & 0xFF == ord('c'):
+                # Press `c` to clear writing board
                 print("Clear board")
                 self.clear_board()
             elif key & 0xFF == ord('n'):
+                # Press `n` to redo false prediction
                 print("Redo prediction")
                 self.redo_classify()
             elif key & 0xFF == ord('e'):
+                # Press `e` to switch between pen and eraser
                 if self.pen_size == 20:
                     print("Eraser")
                     self.pen = [None, None]
@@ -150,6 +157,7 @@ class Tracker():
 
     def setup_virtual_cam(self):
         """ Setup v4l2 lookback config 
+        The following code is adapted from 
         https://arcoresearchgroup.wordpress.com/2020/06/02/virtual-camera-for-opencv-using-v4l2loopback/ 
         """
         print("Setup virtual camera at ", self.virtual_cam)
@@ -198,7 +206,7 @@ class Tracker():
 
     def enable_trackbar(self):
         """ Setup trackbar at top of window 
-        Call this function when initializing the class will allow user to define range of filter colors manually
+        Call this function when initializing the class will allow user to define range of filter colors manually.
         """
         cv.createTrackbar('Lower H', self.window_name, 110, 180, lambda _: None) 
         cv.createTrackbar('Lower S', self.window_name, 120, 255, lambda _: None) 
@@ -233,11 +241,10 @@ class Tracker():
         
     def setup_window(self):
         """ Setup window image to be shown 
-        align depth and colored frames received from intel realsense depth camera, then start tracking a pen
-        either using color filtering or haar cascade object detections to write on frames. 
+        Align depth and colored frames received from intel realsense depth camera, then start tracking a pen
+        either using color filtering or haar cascade object detection to write on frames. 
 
         Edit self.window_images here to change output frame preference.
-        Calling self.write or self.write_color_filter can start writing with a pen in front of the camera.
         """ 
         # get frames 
         if (not self.use_web_cam):
@@ -253,7 +260,6 @@ class Tracker():
             if not aligned_depth_frame or not color_frame: 
                 raise Exception("WARNING: Frame not found")
 
-            # get camera images
             depth_image = np.asanyarray(aligned_depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
         else:
@@ -266,7 +272,7 @@ class Tracker():
         self.board_rect = cv.rectangle(self.board_rect,(self.pen_bound[0][0]-50,self.pen_bound[0][1]-50), \
                                         (self.pen_bound[1][0]+50,self.pen_bound[1][1]+50),(0,255,25), 10)
         
-        # setup menu
+        # Uncomment the following to display menu on the screen
         # self.setup_menu(color_image)
         # cv.imwrite("instructions.png", self.insturctions)
 
@@ -275,7 +281,7 @@ class Tracker():
         # bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
         #                     self.background_color, color_image)
              
-        if self.use_colored_pen:    #track a pen by filtering coler
+        if self.use_colored_pen:    #track a pen by detecting a coler range 
             color_image = self.back_sub(color_image)
             hsv = cv.cvtColor(color_image, cv.COLOR_BGR2HSV)
             mask = self.filter_color(hsv)
@@ -295,6 +301,7 @@ class Tracker():
         thickness = 3
         color = (255, 0, 0)
         color_image = cv.putText(color_image, pred_str, loc, font, fontScale, color, thickness, cv.LINE_AA) 
+
         # Uncomment the following line to print fps on window
         # color_image = cv.putText(color_image, f"fps = {str(self.fps)}", (frame_width-200, frame_height-30), 
         #                             font, 1, (0, 0, 255), 1, cv.LINE_AA) 
@@ -305,7 +312,11 @@ class Tracker():
     
     def back_sub(self, frame):
         """ Background subtraction
+        The following code is adapted from 
         https://automaticaddison.com/how-to-apply-a-mask-to-an-image-using-opencv/
+
+            Returns:
+                output: frames overlayed with a grey mask on the steady background.
         """
         mask = self.backSub.apply(frame)
         mask_inv = cv.bitwise_not(mask)
@@ -323,14 +334,13 @@ class Tracker():
         """ Setup mask on a frame to extract a specified color range from self.get_trackbar_val()
         
             Args:
-                hsv: frame in hsv format
+                hsv: frame in hsv format.
             Returns:
-                mask: mask with fitlered color
+                mask: mask with fitlered color.
         """
         lower_color, upper_color = self.get_tracekbar_val()
         mask = cv.inRange(hsv, lower_color, upper_color)
-        # filter white nosie
-        # https://stackoverflow.com/questions/42272384/opencv-removal-of-noise-in-image
+        # filter white nosie, adapted from https://stackoverflow.com/questions/42272384/opencv-removal-of-noise-in-image
         kernel = np.ones((5,5),np.uint8)
         mask = cv.dilate(mask, kernel, iterations = 1)
         mask = cv.erode(mask, kernel, iterations = 1)
@@ -338,21 +348,18 @@ class Tracker():
         return mask
 
     def write(self, image):
-        """ Write on a board using pen tracked by haar cascade detections. 
+        """ Write on a board using a pen tracked by haar cascade object detection. 
         The default haar cascade model is stored in `cascade/cascade.xml`
-
-            Usage:
-                Move away from the camera to indicate lifting the pen.
-                Press 's' to save the current board to `test_image.pgn` .
-                Pres 'c' to completely clear the writing board.
 
             Args: 
                 image: frame used for haar cascade detections. This frame should have the same 
-                        setup when cascade model is trained. The default is colored RGB image.
+                        setup when the cascade model is trained. The default is colored RGB frame.
+            Returns:
+                image: image with writtings displayed.
         """
+        # detect
         detections = self.cascade.detectMultiScale(image, minSize=(30, 30), maxSize=(80, 80), minNeighbors=10)
         for (x,y,w,h) in detections:
-            # image = cv.rectangle(image,(x,y),(x+w,y+h),(255,0,0), 2)
             if self.pen[0] is None or (abs(self.pen[1][0]-x)<=2*w and abs(self.pen[1][1]-y)<=2*h):
                 image = cv.circle(image, (x, y), 15, (255, 0, 0), -1)
                 if self.pen[0] is None:
@@ -378,20 +385,19 @@ class Tracker():
         return image
     
     def write_color_filter(self, mask, image):
-        """ Write on a board using pen tracked by color filtering.
-        Notice that this method does not have functionality to lift the pen. A pen is only recognized 
-        if the colored contour area is larger than 800 pixels.Due to large noises in color filtering, 
-        pen locations will be averaged on each 10 frames. 
-
-            Usage:
-                Press 's' to save the current board to `test_image.pgn`.
-                Pres 'c' to completely clear the writing board.
+        """ Write on a board using a pen tracked by color filtering.
+        Notice that this method does not have the functionality to lift the pen. A pen is only recognized 
+        if the colored contour area is larger than 500 pixels.Due to large noises in color filtering, 
+        pen locations will be averaged on every 5 frames. 
 
             Args: 
                 mask: frame used for colored pen tracking. This frame should be already filtered 
                         using desired color range.
                 image: frame to show writing on.
+            Returns:
+                image: image with writtings displayed.
         """
+        # detect
         contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         if contours and cv.contourArea(max(contours, key=cv.contourArea)) > 500:
             c = max(contours, key=cv.contourArea)
@@ -401,7 +407,7 @@ class Tracker():
             self.pen_x.append(x)
             self.pen_y.append(y)
 
-            # average pen location on each 5 frames
+            # average pen location on every 5 frames
             if len(self.pen_x) == 5:
                 self.pen[0] = self.pen[1]
                 self.pen[1] = (int(np.average(self.pen_x)), int(np.average(self.pen_y)))
@@ -476,15 +482,20 @@ class Tracker():
             color = (255, 255, 255)
             text = ["Press 'Esc' or 'q' to exit", 
                     "Press 'c' to completely clear board",
+                    "Press 'w' to clear predictions",
                     "Move away from camera to lift pen",
                     "Press 's' to save board and classify letter",
+                    "Press 'a' to save current prediction to dataset",
                     "Press 'n' to indicate wrong prediction and redo",
-                    "Press 'y' to save letter to model"]
+                    "Press 'e' to switch between eraser and pen"]
             self.insturctions = cv.putText(self.insturctions, "Insutrctions:", (20, 50), font, 1, color, 2, cv.LINE_AA) 
             for i, t in enumerate(text):
                 self.insturctions = cv.putText(self.insturctions, t, (20, 90+30*i), font, fontScale, color, thickness, cv.LINE_AA)  
 
     def save_model(self):
+        """ Save current prediction to user dataset 
+        The default path to store the image is user_dataset/
+        """ 
         path = self.image_path
         files = os.listdir(path)
         num = len(files)
