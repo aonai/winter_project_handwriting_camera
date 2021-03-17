@@ -31,7 +31,8 @@ When calling function `Classifier.classify`, user needs to input
 #### Test User Input
 When running `tracker.py`, images can be saved with labeled ground truth by pressing `Y` (make sure the prediction displayed on the screen is correct). `net_classifier.py` includes a user data loader `UserKnownImageDataSet` that returns both data image and label. This loader will loop through the `user_dataset/` folder to load the user dataset. All images stored in this folder have names in the form `<index>_<ground_truth>_<random_string>.png`, where `<index>` is the order of file in the folder (so the last file has index equals size_of_folder-1). This structure allows `UserKnownImageDataSet` to identify unique images using `<index>` and extract the image's ground truth from the file name.  
 
-To test the model's performance on user inputs, at least three images are stored for each label. The overall accuracy is 96.3%. Accuracies for each class is shown below. Notice that the testing set has only 178 images and are all written under the same condition, so the accuracies may be biased. 
+To test the model's performance on user inputs, at least three images are stored for each label. The overall accuracy is 96.3%. Accuracies for each class is shown below. Notice that the testing set has only 178 images and are all written under the same condition, so the accuracies may be biased.    
+
 <img src="../demo/user_input_test.jpg" height="300" alt="user_input_test"> 
 
 ## Related Files
