@@ -5,7 +5,7 @@ import time
 from net_classifier import Classifier
 import os, random, string 
 from shutil import copyfile
-import sys
+import sys, getopt
 import fcntl
 from v4l2 import (
     v4l2_format, VIDIOC_G_FMT, V4L2_BUF_TYPE_VIDEO_OUTPUT, V4L2_PIX_FMT_RGB24,
@@ -17,23 +17,36 @@ frame_width = 640
 frame_height = 480
 frame_rate = 60
 
-pipeline = rs.pipeline()
-config = rs.config()
-config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, frame_rate)
-config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, frame_rate)
-profile = pipeline.start(config)
 
 class Tracker():
     """ Class to handle realsen camera vision 
     This class should setup intel realsense camera streaming, allow setting up filter color
     range using trackbars, track a pen by either color filtering or haar cascade detections to
     writing on the frames, and finally output preditected letters written on the frames. 
+
+        Args:
+            use_web_cam: whether to use webcam for tracking pen.
+            use_colored_pen: whether to track pen using color filtering 
+            use_default_model: whether to use the default trained model `models/model_letters.pth`.
+                            if this is set to False, specify location of the customized model
+                            using `model_path`.
+            model_path: path to PyTorch model.
+            enable_stream: whether to enable streaming to a virtual camera.
+            virtual_cam: address of virtual camera to stream to. 
+                            
     """
     def __init__(self, use_web_cam = False, use_colored_pen=False, use_default_model = True, model_path = None,  
                     enable_stream = False, virtual_cam = "/dev/video11"):
        
         self.use_web_cam =  use_web_cam
-        self.pipeline = cv.VideoCapture(0) if use_web_cam else pipeline
+        if use_web_cam:
+            self.pipeline = cv.VideoCapture(0) 
+        else:
+            self.pipeline = rs.pipeline()
+            config = rs.config()
+            config.enable_stream(rs.stream.depth, frame_width, frame_height, rs.format.z16, frame_rate)
+            config.enable_stream(rs.stream.color, frame_width, frame_height, rs.format.bgr8, frame_rate)
+            self.profile = self.pipeline.start(config)
         
         # variables for depth camera
         self.background_color = 255
@@ -172,7 +185,7 @@ class Tracker():
     def setup_stream(self):
         """ Setup streaming for realsense camera """
         # setup streaming 
-        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_sensor = self.profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
         print("Depth Scale is: " , depth_scale)
 
@@ -262,16 +275,14 @@ class Tracker():
         # bg_removed = np.where((depth_image_3d > self.clipping_distance) | (depth_image_3d <= self.min_distance), \
         #                     self.background_color, color_image)
              
-        # Uncomment the following to track a pen by filtering coler, should be used with depth frames
-        if self.use_colored_pen:
+        if self.use_colored_pen:    #track a pen by filtering coler
             color_image = self.back_sub(color_image)
             hsv = cv.cvtColor(color_image, cv.COLOR_BGR2HSV)
             mask = self.filter_color(hsv)
             color_image = self.write_color_filter(mask, color_image)
             mask_bw = cv.cvtColor(mask, cv.COLOR_GRAY2BGR) # back and white images 
             res = cv.bitwise_and(color_image, color_image, mask=mask)
-        else:
-        # Uncomment the following to track a pen using haar cascade object detection
+        else:       #track a pen using haar cascade object detection
             color_image = self.write(color_image)
 
         # Put classified letters on frames
@@ -290,8 +301,7 @@ class Tracker():
         
 
         # Edit self.window_images to change your preferred output frame
-        # self.window_images = np.hstack((bg_removed, np.fliplr(color_image), res)) # frames for color filtering
-        self.window_images = color_image                                            # frames for haar cascade detections
+        self.window_images = color_image                                        
     
     def back_sub(self, frame):
         """ Background subtraction
@@ -489,18 +499,45 @@ class Tracker():
 
 
 
-def main():
+def main(argv):
     """ The main() function. """
-    tracker = Tracker()                                             # default configuration, track pen using haar cascade model
-    # tracker = Tracker(enable_stream=True)                         # allow streaming to virtual camera
-                                                                    # the default virtual camera address is /dev/video11
-                                                                    # use param `virtual_cam` to specify a different address
-    # tracker = Tracker(use_web_cam=True, use_colored_pen=True)     # track pen using colored mask and webcam
+    use_stream = False
+    use_webcam = False
+    try:
+        opts, args = getopt.getopt(argv,"psw", ["use_stream", "use_webcam"])
+    except getopt.GetoptError:
+        print("Useage:")
+        print(" -s --use_stream          enable stream")
+        print(" -w --use_webcam          use webcam and color tracking")
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-s", "--use_stream"):
+            use_stream = True
+        elif opt in ("-w", "--use_webcam"):
+            use_webcam = True
+        else:
+            print("Useage:")
+            print("-s --use_stream          enable stream")
+            print("-w --use_webcam          use webcam and color tracking")
+            sys.exit(2)
+
+    
+    if use_webcam:
+        print("Use Webcam and Color Tracking")
+        tracker = Tracker(use_web_cam=True, use_colored_pen=True)     # track pen using colored mask and webcam
+    elif use_stream:
+        print("Enable Stream") 
+        tracker = Tracker(enable_stream=True)   # allow streaming to virtual camera
+                                                # the default virtual camera address is /dev/video11
+                                                # use param `virtual_cam` to specify a different address
+    else:
+        print("Use Depth Camera and Haar Cascade Object Detection")
+        tracker = Tracker()           # default configuration, track pen using haar cascade model
 
 
 if __name__=="__main__": 
     try:
-        main()
+        main(sys.argv[1:])
     except Exception as inst:
         print(inst)
     finally:

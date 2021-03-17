@@ -13,15 +13,15 @@ The neural network used to train EMNIST letter dataset has three hidden layers. 
 
 ![nn_architecture](../demo/nn_architecture.png)
 
-The network is trained using 6 epochs and took around 10 minutes. The resulting accuracy is 94.0%. The loss after the last epoch of training is 0.00642. Compared to the previous loss 0.00698. It is likely to increase accuracy of the model by training a few more epochs, but may also cause overfitting. Given that the decrease in loss in as small as 1e-4, 6 epochs of training should be sufficient. 
-<img src="../demo/training_loss.jpg" height="250" alt="training_loss" style="margin-left:50px">   <img src="../demo/training_acc.jpg" height="250" alt="training_acc" style="margin-left:50px">
+The network is trained using 5 epochs and took around 10 minutes. The final accuracies on testing set and validation set are 93.0% and 92.5% respectively. 
+<img src="../demo/training_loss.jpg" height="250" alt="training_loss" >   <img src="../demo/training_acc.jpg" height="250" alt="training_acc" style="margin-left:50px">
 
 #### Model Accuracy
 The overall accuray of trained model on EMNIST letter dataset is around 93.5%. Accuracies on each class for most classes are above 90%. 
 <img src="../demo/test_acc.jpg" height="350" alt="test_acc">  
 
 As seen from the image above, the exceptions are G, I, a L. It is reasonable that I and L are easily confused, given that lower case i and l are very similar. As for G, this is likely to be confused with lowercase Q. The images below are lowercase letters I, L, Q, G from left to right.  
-<img src="../demo/emnist_i.jpg" height="100" alt="emnist_i" style="margin-left:50px">   <img src="../demo/emnist_l.jpg" height="100" alt="emnist_l" style="margin-left:50px"> <img src="../demo/emnist_q.jpg" height="100" alt="emnist_q" style="margin-left:50px">   <img src="../demo/emnist_g.jpg" height="100" alt="emnist_g" style="margin-left:50px">
+<img src="../demo/emnist_i.png" height="100" alt="emnist_i" style="margin-left:50px">   <img src="../demo/emnist_l.png" height="100" alt="emnist_l" style="margin-left:50px"> <img src="../demo/emnist_q.png" height="100" alt="emnist_q" style="margin-left:50px">   <img src="../demo/emnist_g.png" height="100" alt="emnist_g" style="margin-left:50px">
 
 
 ## PyTorch Letter Classification
@@ -40,7 +40,8 @@ Most classes are able to be classified. The images that are misclassified is lik
 To solve this problem, the pen in `tracker.py` can be swtiched between mode writing and erasing by pressing `E`.
 
 ## Related Files
-- `models/model_letter.pth` - trained neural network for classifying EMNIST letters dataset
-- `models/Pytorch_Training.ipynb` - outlines the steps on training the neural network
-- `models/Pytorch_Testing.ipynb` - tests trained neural network on user inputs (writing infron of a depth camera)
-- `net_classifier.py` - includes helper classes and functions for classifying and testing uer inputs
+- `models/model_letter.pth` - trained neural network for classifying EMNIST letters dataset.
+- `models/Pytorch_Training_Letters.ipynb` - outlines the steps on training the neural network using EMNIST letters statset.   
+- `models/Pytorch_Testing.ipynb` - tests trained neural network on user inputs (writing infron of a depth camera).
+- `net_classifier.py` - includes helper classes and functions for classifying and testing uer inputs.
+- [user_dataset.zip](https://drive.google.com/file/d/1Rhdzq3cQDivl3OSlLLYgq3ii3eXRylLw/view?usp=sharing) - a zipfile of images used for testing accuracy of model on user inputs.

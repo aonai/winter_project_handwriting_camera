@@ -3,7 +3,8 @@
 * 2021 Winter Project
 
 ## Overview
-The main goal of this project is to classify letters written in front of a depth camera. First, the project tracks a pen using Haar Cascade algorithm to write letters in front of a depth camera in a way that the frames are interpreted as a canvas. Then, it will store canvas into an image, use a pre-trained model to classify the letter, and print the result back to frames. The code provides an option to store the last classified letter into a custom dataset that can be used for further learning. The output frames can also be streamed onto a virtual camera so that the results are displayable in Zoom.
+The main goal of this project is to classify letters written in front of a depth camera. First, the project tracks a pen to write letters in front of a depth camera in a way that the frames are interpreted as a canvas. Then, it will store canvas into an image, use a pre-trained model to classify the letter, and print the result back to frames. The code provides an option to store the last classified letter into a custom dataset that can be used for further learning. The output frames can also be streamed onto a virtual camera so that the results are displayable in Zoom. Checkout the video demo 
+[here](https://youtu.be/9Fl5xeTdH-4).
 
 ## Requirements
 * [PyTorch](https://pytorch.org/get-started/locally/)
@@ -17,15 +18,38 @@ The main goal of this project is to classify letters written in front of a depth
     * Notice: an error message `TypeError: unsupported operand type(s) for +: 'range' and 'list'` may occur when importing from `v4l2`, go ahead and change `range(_,_)` to `list(rang(_,_))` in the source code. [See bug report.](https://bugs.launchpad.net/python-v4l2/+bug/1664158)   
 * [ffmpeg](https://www.ffmpeg.org/) 
 
-## Menu
--
--
--
+## How to Use
+#### Options
+1. Run project using the default configuration, which is to track pen using a depth camera and a Haar Cascade model. 
+    ```
+    python3 tracker.py
+    ```
+2. Enable streaming to a virtual camera while tracking pen with depth camera and Haar Cascade model.
+    ```
+    python3 tracker.py -s
+    ```
+3. Track pen using webcam and color filtering. The defualt color is red.
+    ```
+    python3 tracker.py -w`
+    ``` 
+4. Other options included in `Tracker` class are as follows:
+    - `use_default_model` - whether to use the default trained model `models/model_letters.pth`.
+    - `model_path` - path to customized PyTorch model.
+    - `virtual_cam` - address of customzied virtual camera to stream to.   
+#### Keyboard Input     
+While running the code, press the following keys to execute corresponding functions.   
+- `Q` or `ESC` - exit window.    
+- `C` - clear writing board.   
+- `W` - clear predictions displayed on screen.   
+- `S` - save writing and classify letter.   
+- `A` - save current writing to user dataset.   
+- `N` - redo classification, will display the next possible letter.   
+- `E` - switch between pen and eraser.   
 
 ## Contents
 1. Machine Learning  
     - [PyTorch Letter Training](models/README.md)
-    - [PyTorch Letter Classification](models/README.md)
+    - [PyTorch Letter Classification](models/README.md#pyTorch-letter-classification)
 2. Computer Vision 
     - [Track Colored Pen](#track-colored-pen) vs. [Haar Cascade Object Detection](cascade/README.md)
 3. Integration
@@ -40,9 +64,9 @@ colored pen, is used. To make detecting the color range easier, `tracker.py` als
 ![gif]
 
 ## Combine Classifier with Opencv Frames  
-This project consists of two main classes: `Tracker` and `Classifier`. `Tracker` is responsible for tracking a pen in front of a depth camera, and `Classifier` is responsible for classifying user inputs, which are cropped frames that bound user's writing. When running `tracker.py`, `Tracker` will first initialize a `Classifier` class and start tracking pen using either color filtering or Haar Cascade object detection, then it will wait for keyboard inputs. Specific functions of keys are explained in [menu](#menu). A simplified workflow of how `Tracker`  and `Classifier` are integrated together is shown below. 
+This project consists of two main classes: `Tracker` and `Classifier`. `Tracker` is responsible for tracking a pen in front of a depth camera, and `Classifier` is responsible for classifying user inputs, which are cropped frames that bound user's writing. When running `tracker.py`, `Tracker` will first initialize a `Classifier` class and start tracking pen using either color filtering or Haar Cascade object detection, then it will wait for keyboard inputs. Specific functions of keys are explained in [How to Use](#how-to-use). A simplified workflow of how `Tracker`  and `Classifier` are integrated together is shown below. 
 
-![simple_workflow](demo/simple_workflow.jpg)
+![simple_workflow](demo/simple_workflow.png)
 
 When initializing `Tracker`, user needs to specify a path to a trained model and a folder to store user inputs so that `Classifier` can load the network at startoff and wait for images to be classified. The input for function `classify` is an image file name in form `<index>_<random_string>.png`. `classify` will then load the image that correspond to the correct file name. This is to ensure that proper transforms are applied to images and the resulting data to be put into model is the same as training. 
 
