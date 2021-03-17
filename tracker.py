@@ -29,12 +29,11 @@ class Tracker():
     range using trackbars, track a pen by either color filtering or haar cascade detections to
     writing on the frames, and finally output preditected letters written on the frames. 
     """
-    def __init__(self, use_web_cam = False, use_default_model = True, model_path = None,  
+    def __init__(self, use_web_cam = False, use_colored_pen=False, use_default_model = True, model_path = None,  
                     enable_stream = False, virtual_cam = "/dev/video11"):
        
         self.use_web_cam =  use_web_cam
         self.pipeline = cv.VideoCapture(0) if use_web_cam else pipeline
-        # self.backSub = cv.createBackgroundSubtractorKNN()
         
         # variables for depth camera
         self.background_color = 255
@@ -44,6 +43,9 @@ class Tracker():
         self.fps = 0
 
         # variable for pen tracking
+        self.use_colored_pen = use_colored_pen
+        if self.use_colored_pen:
+            self.backSub = cv.createBackgroundSubtractorKNN()
         self.pen = [None, None]
         self.pen_bound = [[frame_width, frame_height], [0,0]]
         self.pen_x = []
@@ -261,17 +263,16 @@ class Tracker():
         #                     self.background_color, color_image)
              
         # Uncomment the following to track a pen by filtering coler, should be used with depth frames
-        # color_image = self.back_sub(color_image)
-        # hsv = cv.cvtColor(color_image, cv.COLOR_BGR2HSV)
-        # mask = self.filter_color(hsv)
-        # color_image = cv.add(color_image, self.board_rect)
-        # color_image = self.write_color_filter(mask, color_image)
-        # mask_bw = cv.cvtColor(mask, cv.COLOR_GRAY2BGR) # back and white images 
-        # res = cv.bitwise_and(color_image, color_image, mask=mask)
-
+        if self.use_colored_pen:
+            color_image = self.back_sub(color_image)
+            hsv = cv.cvtColor(color_image, cv.COLOR_BGR2HSV)
+            mask = self.filter_color(hsv)
+            color_image = self.write_color_filter(mask, color_image)
+            mask_bw = cv.cvtColor(mask, cv.COLOR_GRAY2BGR) # back and white images 
+            res = cv.bitwise_and(color_image, color_image, mask=mask)
+        else:
         # Uncomment the following to track a pen using haar cascade object detection
-        # color_image = cv.add(color_image, self.board_rect)
-        color_image = self.write(color_image)
+            color_image = self.write(color_image)
 
         # Put classified letters on frames
         color_image = np.fliplr(color_image)
@@ -320,6 +321,7 @@ class Tracker():
         mask = cv.inRange(hsv, lower_color, upper_color)
         # filter white nosie
         # https://stackoverflow.com/questions/42272384/opencv-removal-of-noise-in-image
+        kernel = np.ones((5,5),np.uint8)
         mask = cv.dilate(mask, kernel, iterations = 1)
         mask = cv.erode(mask, kernel, iterations = 1)
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
@@ -389,8 +391,8 @@ class Tracker():
             self.pen_x.append(x)
             self.pen_y.append(y)
 
-            # average pen location on each 10 frames
-            if len(self.pen_x) == 2:
+            # average pen location on each 5 frames
+            if len(self.pen_x) == 5:
                 self.pen[0] = self.pen[1]
                 self.pen[1] = (int(np.average(self.pen_x)), int(np.average(self.pen_y)))
                 self.pen_x = []
@@ -402,7 +404,6 @@ class Tracker():
                 self.pen_bound[0][1] = min(self.pen_bound[0][1], self.pen[1][1])
                 self.pen_bound[1][0] = max(self.pen_bound[1][0], self.pen[1][0])
                 self.pen_bound[1][1] = max(self.pen_bound[1][1], self.pen[1][1])
-                print("Bound = ", self.pen_bound)
     
         else:
             self.pen = [None, None]
@@ -490,7 +491,12 @@ class Tracker():
 
 def main():
     """ The main() function. """
-    tracker = Tracker( enable_stream = True)
+    tracker = Tracker()                                             # default configuration, track pen using haar cascade model
+    # tracker = Tracker(enable_stream=True)                         # allow streaming to virtual camera
+                                                                    # the default virtual camera address is /dev/video11
+                                                                    # use param `virtual_cam` to specify a different address
+    # tracker = Tracker(use_web_cam=True, use_colored_pen=True)     # track pen using colored mask and webcam
+
 
 if __name__=="__main__": 
     try:
