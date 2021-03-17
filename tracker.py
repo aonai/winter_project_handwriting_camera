@@ -438,7 +438,7 @@ class Tracker():
         letters = string.ascii_lowercase
         rnd_str = ( ''.join(random.choice(letters) for i in range(10)) )
         file_name = f'{num}_{rnd_str}.png'
-        thresh = 50
+        thresh = 30
         from_x = self.pen_bound[0][0] - thresh
         from_y = self.pen_bound[0][1] - thresh
         to_x = self.pen_bound[1][0] + thresh
