@@ -10,7 +10,7 @@ The neural network used to train the EMNIST letter dataset has three hidden laye
 ![nn_architecture](../demo/nn_architecture.png)
 
 #### Train Model
-The network is trained using 5 epochs and took around 25 minutes. The final accuracies on the training set and validation set are 94.0% and 93.3% respectively. 
+The network is trained using 5 epochs and took around 25 minutes. The final accuracies on the training set and validation set are 94.0% and 93.3% respectively.    
 <img src="../demo/training_loss.jpg" height="250" alt="training_loss" >   <img src="../demo/training_acc.jpg" height="250" alt="training_acc" style="margin-left:50px">
 
 The overall accuracy of the trained model on the EMNIST letter dataset is 93.3%. Accuracies on each class for most classes are above 90%. The image below shows the accuracies of the model for each class. 
