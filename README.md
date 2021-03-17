@@ -116,7 +116,7 @@ The resulting outputs of this project can be streamed onto a virtual camera so t
     ```
 6. Open Zoom and select `Tracker_1`. Now the video displayed should be the same as the resulting frames of `tracker.py`.   
 
-<img src="demo/stream_zoom.gif" height="350" alt="zoom" style="margin-left:50px" style="margin-left:50px"> 
+    <img src="demo/stream_zoom.gif" height="350" alt="zoom"> 
 
 
 7. When finished with the project, remove loopback devices.
