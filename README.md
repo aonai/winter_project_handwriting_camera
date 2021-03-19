@@ -3,7 +3,7 @@
 - 2021 Winter Project
 
 ## Overview
-The main goal of this project is to classify letters written in front of a camera. First, the project tracks a pen to write letters in front of the camera in a way that the frames are interpreted as a canvas. Then, it will store canvas into an image, use a pre-trained model to classify the letter, and print the result back to frames. The project provides an option to store the last classified letter into a custom dataset that can be used for further learning. The output frames can also be streamed onto a virtual camera so that the results are displayable in Zoom. Check out the video demo [here](https://youtu.be/9Fl5xeTdH-4).
+The main goal of this project is to classify letters written in front of a camera. First, the project tracks a pen to write letters in front of the camera in a way that the frames are interpreted as a canvas. Then, it will store canvas into an image, use a pre-trained model to classify the letter, and print the result back to frames. The project provides an option to store the last classified letter into a custom dataset that can be used for further learning. The output frames can also be streamed onto a virtual camera so that the results are displayable in Zoom. Check out more about this project [here](https://aonai.github.io/linked_posts/handwriting_camera.html).
 
 ## Requirements
 * [PyTorch](https://pytorch.org/get-started/locally/)
